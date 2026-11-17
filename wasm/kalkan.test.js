@@ -4,10 +4,11 @@
 //   cargo build --release --features ffi
 //   bun test wasm/
 import { dlopen, FFIType as T, toArrayBuffer } from "bun:ffi";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "bun:test";
 import { KalkanHatasi, KalkanMotoru } from "./kalkan.js";
 
-const lib = dlopen(new URL("../target/release/libkalkan.so", import.meta.url).pathname, {
+const lib = dlopen(fileURLToPath(new URL("../target/release/libkalkan.so", import.meta.url)), {
   kalkan_alloc: { args: [T.u64_fast], returns: T.ptr },
   kalkan_free: { args: [T.ptr, T.u64_fast], returns: T.void },
   kalkan_out_ptr: { args: [], returns: T.ptr },

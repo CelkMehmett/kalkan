@@ -4,6 +4,7 @@
 //   cargo build --release --features ffi
 //   bun add -d happy-dom && bun test wasm/
 import { dlopen, FFIType as T, toArrayBuffer } from "bun:ffi";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import { KalkanMotoru } from "./kalkan.js";
@@ -27,7 +28,7 @@ const ABI = Object.fromEntries(
     kalkan_stream_finish: [[T.u32], T.u32],
   }).map(([k, [args, returns]]) => [k, { args, returns }]),
 );
-const lib = dlopen(new URL("../target/release/libkalkan.so", import.meta.url).pathname, ABI);
+const lib = dlopen(fileURLToPath(new URL("../target/release/libkalkan.so", import.meta.url)), ABI);
 const motor = new KalkanMotoru({
   ex: lib.symbols,
   yaz(b) {

@@ -1,6 +1,6 @@
 """demo.html + kalkan.js + kalkan.wasm → tek dosyalık dist/index.html.
 
-Ortaya çıkan dosya hiçbir şey yüklemeden (yazı tipleri hariç) çalışır;
+Ortaya çıkan dosya dışarıdan hiçbir şey yüklemeden çalışır;
 GitHub Pages'e veya herhangi bir statik sunucuya olduğu gibi konabilir.
 """
 import base64
