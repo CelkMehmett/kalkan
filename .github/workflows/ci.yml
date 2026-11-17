@@ -1,0 +1,41 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo test --workspace --exclude kalkan-py
+      - run: cargo test --features ffi --lib
+      - run: cargo clippy --workspace --all-targets --features ffi -- -D warnings
+      - run: cargo doc --no-deps --all-features
+      - run: test -f LICENSE-MIT && test -f LICENSE-APACHE
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install maturin pytest
+      - run: maturin build --release -m python/Cargo.toml -o dist
+      - run: pip install dist/*.whl
+      - run: pytest -q python/tests
+
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: oven-sh/setup-bun@v2
+      - run: cargo build --release --features ffi --lib
+      - run: cd wasm && bun install && bun test

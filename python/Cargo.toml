@@ -1,0 +1,16 @@
+[package]
+name = "kalkan-py"
+version = "0.2.0"
+edition = "2021"
+description = "kalkan için Python bağlantısı"
+repository = "https://github.com/CelkMehmett/kalkan"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "_kalkan"
+crate-type = ["cdylib"]
+
+[dependencies]
+kalkan = { path = ".." }
+pyo3 = { version = "0.25", features = ["extension-module", "abi3-py39"] }

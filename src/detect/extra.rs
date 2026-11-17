@@ -1,0 +1,281 @@
+//! IP adresi, doğum tarihi ve pasaport dedektörleri.
+
+use crate::entity::{Kind, Match};
+use crate::text::{boundary_after, boundary_before, context_has, eq_tr_ci};
+
+const VERSION_WORDS: &[&str] = &["sürüm", "versiyon", "version", "ver.", "build", "release", "v."];
+const BIRTH_WORDS: &[&str] = &["doğum", "dogum", "d.tarihi", "d. tarihi", "d.t.", "doğ.", "birth", "dob"];
+const PASSPORT_WORDS: &[&str] = &["pasaport", "passport"];
+const MONTHS: &[&str] = &[
+    "ocak", "şubat", "mart", "nisan", "mayıs", "haziran", "temmuz", "ağustos", "eylül", "ekim", "kasım", "aralık",
+];
+
+// ---------------------------------------------------------------- IPv4 / IPv6
+
+pub(crate) fn scan_ipv4(text: &str, out: &mut Vec<Match>) {
+    let b = text.as_bytes();
+    let n = b.len();
+    let mut i = 0;
+    while i < n {
+        let Some(off) = b[i..].iter().position(u8::is_ascii_digit) else { break };
+        i += off;
+        let prev_dot = i > 0 && b[i - 1] == b'.';
+        if !boundary_before(text, i) || prev_dot {
+            while i < n && (b[i].is_ascii_digit() || b[i] == b'.') {
+                i += 1;
+            }
+            continue;
+        }
+        match parse_ipv4(b, i) {
+            Some(end) if boundary_after(text, end) && !(end + 1 < n && b[end] == b'.' && b[end + 1].is_ascii_digit()) => {
+                let conf = if context_has(text, i, 24, VERSION_WORDS) { 50 } else { 85 };
+                out.push(Match::new(Kind::Ip, i..end, conf));
+                i = end;
+            }
+            _ => {
+                while i < n && (b[i].is_ascii_digit() || b[i] == b'.') {
+                    i += 1;
+                }
+            }
+        }
+    }
+}
+
+fn parse_ipv4(b: &[u8], mut i: usize) -> Option<usize> {
+    for octet in 0..4 {
+        if octet > 0 {
+            if b.get(i) != Some(&b'.') {
+                return None;
+            }
+            i += 1;
+        }
+        let s = i;
+        while i < b.len() && b[i].is_ascii_digit() && i - s < 4 {
+            i += 1;
+        }
+        let len = i - s;
+        if len == 0 || len > 3 || (len > 1 && b[s] == b'0') {
+            return None;
+        }
+        let v: u32 = b[s..i].iter().fold(0, |a, &d| a * 10 + (d - b'0') as u32);
+        if v > 255 {
+            return None;
+        }
+    }
+    Some(i)
+}
+
+pub(crate) fn scan_ipv6(text: &str, out: &mut Vec<Match>) {
+    let b = text.as_bytes();
+    let n = b.len();
+    let is_c = |c: u8| c.is_ascii_hexdigit() || c == b':';
+    let mut last_end = 0;
+    let mut from = 0;
+    // Yalnızca ':' çevresine bakarız; düz metindeki a-f harflerine takılmayız.
+    while let Some(off) = b[from..].iter().position(|&c| c == b':') {
+        let colon = from + off;
+        from = colon + 1;
+        if colon < last_end {
+            continue;
+        }
+        let mut s = colon;
+        while s > 0 && is_c(b[s - 1]) {
+            s -= 1;
+        }
+        let mut e = colon;
+        while e < n && is_c(b[e]) {
+            e += 1;
+        }
+        from = from.max(e);
+        if valid_ipv6(&b[s..e]) && boundary_before(text, s) && boundary_after(text, e) {
+            out.push(Match::new(Kind::Ip, s..e, 85));
+            last_end = e;
+        }
+    }
+}
+
+fn valid_ipv6(s: &[u8]) -> bool {
+    let txt = match core::str::from_utf8(s) {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+    let double = txt.matches("::").count();
+    if double > 1 || txt.contains(":::") || txt.matches(':').count() < 2 {
+        return false;
+    }
+    let groups: Vec<&str> = txt.split(':').filter(|g| !g.is_empty()).collect();
+    if groups.iter().any(|g| g.len() > 4) {
+        return false;
+    }
+    let hex_digits: usize = groups.iter().map(|g| g.len()).sum();
+    if double == 1 {
+        // "a::b" gibi kısa kelime kalıplarını ele: en az 2 grup ve 4 hane.
+        groups.len() >= 2 && groups.len() <= 7 && hex_digits >= 4
+    } else {
+        // Tam yazım 8 grup ister; "14:30:00" saatleri ve MAC adresleri elenir.
+        groups.len() == 8 && !txt.starts_with(':') && !txt.ends_with(':')
+    }
+}
+
+// ---------------------------------------------------------------- Doğum tarihi
+
+pub(crate) fn scan_birth_date(text: &str, out: &mut Vec<Match>) {
+    let b = text.as_bytes();
+    let n = b.len();
+    let mut i = 0;
+    while i < n {
+        let Some(off) = b[i..].iter().position(u8::is_ascii_digit) else { break };
+        i += off;
+        if !boundary_before(text, i) {
+            while i < n && b[i].is_ascii_digit() {
+                i += 1;
+            }
+            continue;
+        }
+        if let Some(end) = numeric_date(b, i).or_else(|| textual_date(text, i)) {
+            if boundary_after(text, end) && context_has(text, i, 40, BIRTH_WORDS) {
+                out.push(Match::new(Kind::BirthDate, i..end, 90));
+                i = end;
+                continue;
+            }
+        }
+        while i < n && b[i].is_ascii_digit() {
+            i += 1;
+        }
+    }
+}
+
+fn read_num(b: &[u8], i: usize, min: usize, max: usize) -> Option<(u32, usize)> {
+    let mut j = i;
+    while j < b.len() && b[j].is_ascii_digit() && j - i < max {
+        j += 1;
+    }
+    if j - i < min || (j < b.len() && b[j].is_ascii_digit()) {
+        return None;
+    }
+    Some((b[i..j].iter().fold(0, |a, &d| a * 10 + (d - b'0') as u32), j))
+}
+
+fn valid_dmy(d: u32, m: u32, y: u32) -> bool {
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let days = match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days).contains(&d) && (1900..=2030).contains(&y)
+}
+
+/// 05.03.1990, 5/3/1990, 05-03-1990, 1990-03-05
+fn numeric_date(b: &[u8], i: usize) -> Option<usize> {
+    let sep_ok = |c: Option<&u8>| matches!(c, Some(b'.' | b'/' | b'-'));
+    // yyyy-mm-dd
+    if let Some((y, j)) = read_num(b, i, 4, 4) {
+        if b.get(j) == Some(&b'-') {
+            let (m, k) = read_num(b, j + 1, 1, 2)?;
+            if b.get(k) != Some(&b'-') {
+                return None;
+            }
+            let (d, e) = read_num(b, k + 1, 1, 2)?;
+            return valid_dmy(d, m, y).then_some(e);
+        }
+        return None;
+    }
+    let (d, j) = read_num(b, i, 1, 2)?;
+    if !sep_ok(b.get(j)) {
+        return None;
+    }
+    let sep = b[j];
+    let (m, k) = read_num(b, j + 1, 1, 2)?;
+    if b.get(k) != Some(&sep) {
+        return None;
+    }
+    let (y, e) = read_num(b, k + 1, 4, 4)?;
+    valid_dmy(d, m, y).then_some(e)
+}
+
+/// "5 Mart 1990", "05 AĞUSTOS 1987"
+fn textual_date(text: &str, i: usize) -> Option<usize> {
+    let b = text.as_bytes();
+    let (d, j) = read_num(b, i, 1, 2)?;
+    if b.get(j) != Some(&b' ') {
+        return None;
+    }
+    let ws = j + 1;
+    let we = text[ws..].char_indices().find(|(_, c)| !c.is_alphabetic()).map_or(text.len(), |(k, _)| ws + k);
+    if we == ws || we - ws > 16 {
+        return None;
+    }
+    let word = &text[ws..we];
+    let month = MONTHS.iter().position(|&m| eq_tr_ci(word, m))? as u32 + 1;
+    if b.get(we) != Some(&b' ') {
+        return None;
+    }
+    let (y, e) = read_num(b, we + 1, 4, 4)?;
+    valid_dmy(d, month, y).then_some(e)
+}
+
+// ---------------------------------------------------------------- Pasaport
+
+/// "Pasaport no: U12345678" — bir büyük harf + 7-8 hane, bağlam kelimesiyle.
+pub(crate) fn scan_passport(text: &str, out: &mut Vec<Match>) {
+    let b = text.as_bytes();
+    let n = b.len();
+    for i in 0..n.saturating_sub(7) {
+        if !b[i].is_ascii_uppercase() || !boundary_before(text, i) {
+            continue;
+        }
+        let mut j = i + 1;
+        while j < n && b[j].is_ascii_digit() {
+            j += 1;
+        }
+        if (7..=8).contains(&(j - i - 1)) && boundary_after(text, j) && context_has(text, i, 48, PASSPORT_WORDS) {
+            out.push(Match::new(Kind::Passport, i..j, 90));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(f: fn(&str, &mut Vec<Match>), s: &str) -> Vec<String> {
+        let mut v = Vec::new();
+        f(s, &mut v);
+        v.iter().filter(|m| m.confidence >= 70).map(|m| m.text(s).to_string()).collect()
+    }
+
+    #[test]
+    fn ipv4() {
+        assert_eq!(run(scan_ipv4, "Giriş 192.168.1.10 ve 8.8.8.8 adresinden."), ["192.168.1.10", "8.8.8.8"]);
+        assert!(run(scan_ipv4, "sürüm 1.2.3.4, tarih 12.03.2024, 256.1.1.1, 1.2.3.4.5, 01.2.3.4").is_empty());
+    }
+
+    #[test]
+    fn ipv6() {
+        assert_eq!(
+            run(scan_ipv6, "IP: 2001:db8:85a3::8a2e:370:7334, saat 14:30:00, mac aa:bb:cc:dd:ee:ff"),
+            ["2001:db8:85a3::8a2e:370:7334"]
+        );
+        assert_eq!(run(scan_ipv6, "fe80:0:0:0:202:b3ff:fe1e:8329 bağlı"), ["fe80:0:0:0:202:b3ff:fe1e:8329"]);
+        assert!(run(scan_ipv6, "Not: a::b ve Saat:12:30").is_empty());
+    }
+
+    #[test]
+    fn birth_date() {
+        assert_eq!(run(scan_birth_date, "Doğum tarihi: 05.03.1990"), ["05.03.1990"]);
+        assert_eq!(run(scan_birth_date, "DOĞUM TARİHİ 5 Mart 1990."), ["5 Mart 1990"]);
+        assert_eq!(run(scan_birth_date, "d.t. 1987-08-21"), ["1987-08-21"]);
+        assert!(run(scan_birth_date, "Fatura tarihi 05.03.1990 ve 11.11.2011").is_empty());
+        assert!(run(scan_birth_date, "doğum 31.02.1990, doğum 32.01.1990").is_empty());
+        assert_eq!(run(scan_birth_date, "doğum: 29.02.2000"), ["29.02.2000"]);
+    }
+
+    #[test]
+    fn passport() {
+        assert_eq!(run(scan_passport, "Pasaport No: U12345678"), ["U12345678"]);
+        assert!(run(scan_passport, "Sipariş kodu U12345678").is_empty());
+    }
+}

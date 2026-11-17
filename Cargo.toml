@@ -1,0 +1,41 @@
+[package]
+name = "kalkan"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.82"
+description = "Türkçe kişisel verileri (TCKN, VKN, IBAN, telefon, kart, plaka, ad-soyad) LLM'e gitmeden maskeleyen ve cevapta geri yükleyen, sıfır bağımlılıklı KVKK kalkanı."
+license = "MIT OR Apache-2.0"
+keywords = ["kvkk", "pii", "llm", "turkish", "anonymization"]
+categories = ["text-processing", "privacy"]
+readme = "README.md"
+repository = "https://github.com/CelkMehmett/kalkan"
+homepage = "https://github.com/CelkMehmett/kalkan"
+documentation = "https://docs.rs/kalkan"
+exclude = [".github/", "bench/", "wasm/", "target/", "corpus*", "*.jsonl"]
+
+[workspace]
+members = [".", "python"]
+
+[features]
+# Bağımlılıksız C ABI (WASM ve diğer dillerden çağırmak için). Yalnızca bu
+# özellik açıkken `unsafe` kullanılır; çekirdek her zaman `unsafe`'siz derlenir.
+ffi = []
+
+[dependencies]
+# Bilerek boş: sıfır bağımlılık, WASM ve gömülü sistemlere kolay derlenir.
+
+[lib]
+# cdylib: WASM (`--features ffi`) ve diğer dillerden yükleme için.
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "kalkan"
+path = "src/bin/kalkan.rs"
+
+[package.metadata.docs.rs]
+all-features = true
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"

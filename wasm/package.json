@@ -1,0 +1,8 @@
+{
+  "name": "kalkan-wasm",
+  "private": true,
+  "type": "module",
+  "description": "kalkan'ın tarayıcı sarmalayıcısı ve demo sayfası",
+  "scripts": { "test": "bun test" },
+  "devDependencies": { "happy-dom": "^21.0.0" }
+}

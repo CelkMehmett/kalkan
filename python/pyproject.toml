@@ -1,0 +1,29 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "kalkan"
+version = "0.2.0"
+description = "Türkçe kişisel verileri LLM'e gitmeden maskeleyen, cevapta geri yükleyen hızlı KVKK kalkanı (Rust)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT OR Apache-2.0" }
+keywords = ["kvkk", "pii", "llm", "turkish", "anonymization", "privacy"]
+classifiers = [
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: 3",
+  "Natural Language :: Turkish",
+  "Topic :: Security",
+  "Topic :: Text Processing",
+]
+
+[project.urls]
+Repository = "https://github.com/CelkMehmett/kalkan"
+Documentation = "https://docs.rs/kalkan"
+Changelog = "https://github.com/CelkMehmett/kalkan/blob/main/CHANGELOG.md"
+
+[tool.maturin]
+python-source = "."
+module-name = "kalkan._kalkan"
+features = []

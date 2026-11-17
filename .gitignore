@@ -1,0 +1,10 @@
+target/
+*.jsonl
+corpus.txt*
+__pycache__/
+node_modules/
+wasm/kalkan.wasm
+wasm/dist/
+*.so
+*.whl
+.pytest_cache/

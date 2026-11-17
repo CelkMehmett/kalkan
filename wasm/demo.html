@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kalkan: tarayıcıda KVKK maskeleme</title>
+<meta name="description" content="Türkçe kişisel verileri (TC kimlik, IBAN, telefon, ad-soyad...) LLM'e göndermeden önce tarayıcınızda maskeleyin. Hiçbir veri bu sayfadan çıkmaz.">
+<style>
+:root {
+  --kagit: #eef3f6;      /* kimlik kartı zemini */
+  --kart: #f8fbfc;
+  --murekkep: #182847;   /* lacivert mürekkep */
+  --soluk: #56657f;
+  --gilyos: #8fb3bd;     /* güvenlik baskısı deseni */
+  --muhur: #b3261e;      /* resmi mühür kırmızısı */
+  --muhur-zemin: #f7e3e1;
+  --yesil: #1f6b4f;
+  --cizgi: #c9d6de;
+  --odak: #2a5bd7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --kagit: #0f1a2c; --kart: #15233a; --murekkep: #e3eaf3; --soluk: #9aa9bf;
+    --gilyos: #35566a; --muhur: #ff8a7f; --muhur-zemin: #3a1d22; --yesil: #6fd1a6; --cizgi: #2a3c58; --odak: #8fb0ff;
+  }
+}
+:root[data-theme="dark"] {
+  --kagit: #0f1a2c; --kart: #15233a; --murekkep: #e3eaf3; --soluk: #9aa9bf;
+  --gilyos: #35566a; --muhur: #ff8a7f; --muhur-zemin: #3a1d22; --yesil: #6fd1a6; --cizgi: #2a3c58; --odak: #8fb0ff;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--kagit); color: var(--murekkep);
+  font: 400 17px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.sayfa { max-width: 1120px; margin: 0 auto; padding: 0 24px 80px; }
+
+/* Üst: gilyoş deseni yalnızca başlık bandında */
+.bant { position: relative; overflow: hidden; border-bottom: 1px solid var(--cizgi); }
+.bant svg.desen { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--gilyos); opacity: .55; pointer-events: none; }
+.bant .ic { position: relative; max-width: 1120px; margin: 0 auto; padding: 28px 24px 44px; }
+.ust { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.marka { font-weight: 700; font-size: 22px; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+.marka svg { width: 26px; height: 26px; }
+.guvence { font-size: 14px; color: var(--yesil); display: flex; align-items: center; gap: 8px; }
+.guvence::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 18%, transparent); }
+h1 {
+  font-weight: 600; font-size: clamp(34px, 5.4vw, 60px); line-height: 1.04; letter-spacing: -.025em;
+  margin: 48px 0 16px; max-width: 16ch;
+}
+.giris { font-size: 19px; color: var(--soluk); max-width: 58ch; margin: 0; }
+
+/* Ayarlar */
+.ayarlar { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: end; margin: 36px 0 18px; }
+.ayarlar label, .alan-adi { font-size: 14px; font-weight: 500; color: var(--soluk); display: block; margin-bottom: 6px; }
+.secim { display: inline-flex; border: 1px solid var(--cizgi); border-radius: 8px; background: var(--kart); padding: 3px; }
+.secim button {
+  font: inherit; font-size: 15px; border: 0; background: transparent; color: var(--murekkep);
+  padding: 7px 14px; border-radius: 6px; cursor: pointer;
+}
+.secim button[aria-pressed="true"] { background: var(--murekkep); color: var(--kagit); }
+input[type="text"] {
+  font: inherit; font-size: 15px; width: min(340px, 100%); padding: 9px 12px; border-radius: 8px;
+  border: 1px solid var(--cizgi); background: var(--kart); color: var(--murekkep);
+}
+.terim { flex: 1 1 260px; }
+:focus-visible { outline: 2px solid var(--odak); outline-offset: 2px; }
+
+/* Çalışma alanı */
+.ikili { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.panel { min-width: 0; }
+.panel .baslik { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; margin-bottom: 8px; }
+.panel h2 { font-size: 17px; font-weight: 600; margin: 0; white-space: nowrap; }
+.panel .not { font-size: 14px; color: var(--soluk); }
+textarea, .cikti {
+  width: 100%; min-height: 260px; margin: 0; padding: 16px 18px; border-radius: 10px;
+  font: 400 15px/1.7 ui-monospace, "SFMono-Regular", Consolas, monospace; color: var(--murekkep);
+  border: 1px solid var(--cizgi); background: var(--kart); resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.cikti { border-style: dashed; }
+.cikti.koyu { border-style: solid; border-color: var(--murekkep); }
+mark {
+  background: var(--muhur-zemin); color: var(--muhur); border: 1.5px solid var(--muhur);
+  border-radius: 3px; padding: 0 2px; font-weight: 500; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+}
+mark.gercek { background: transparent; color: var(--yesil); border-color: currentColor; border-style: dotted; }
+/* Damga: mühür mürekkebi bir an koyu basılır, sonra kurur. Satır akışını bozmaz. */
+.damga { animation: damga .9s ease-out both; }
+.damga:nth-of-type(2n) { animation-delay: .08s; }
+.damga:nth-of-type(3n) { animation-delay: .16s; }
+@keyframes damga { from { background: var(--muhur); color: var(--kagit); } to { background: var(--muhur-zemin); color: var(--muhur); } }
+@media (prefers-reduced-motion: reduce) { .damga { animation: none; } }
+
+.durum { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 15px; color: var(--soluk); margin: 12px 0 0; }
+.durum strong { color: var(--murekkep); font-weight: 600; }
+
+/* İkinci adım */
+.adim { margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--cizgi); }
+.adim > h2 { font-size: 26px; font-weight: 600; letter-spacing: -.015em; margin: 0 0 6px; }
+.adim > p { color: var(--soluk); margin: 0 0 22px; max-width: 64ch; }
+.denetim { margin-top: 12px; font-size: 15px; padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--yesil); background: var(--kart); }
+.denetim.uyari { border-left-color: var(--muhur); }
+.denetim ul { margin: 6px 0 0; padding-left: 20px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th { text-align: left; font-weight: 500; color: var(--soluk); padding: 8px 12px; border-bottom: 1px solid var(--cizgi); }
+td { padding: 9px 12px; border-bottom: 1px solid var(--cizgi); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 14px; overflow-wrap: anywhere; }
+td:first-child { color: var(--muhur); white-space: nowrap; }
+.bos { color: var(--soluk); font-family: inherit; }
+
+.kur { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.kur pre { margin: 6px 0 0; padding: 12px 14px; border-radius: 8px; background: var(--murekkep); color: var(--kagit); font: 14px/1.5 ui-monospace, "SFMono-Regular", Consolas, monospace; overflow-x: auto; }
+.kur span { font-size: 15px; font-weight: 500; }
+footer { margin-top: 64px; font-size: 14px; color: var(--soluk); }
+footer a { color: inherit; }
+.hata { padding: 14px 16px; border-radius: 8px; background: var(--muhur-zemin); color: var(--muhur); margin-top: 24px; }
+
+@media (max-width: 760px) {
+  .ikili { grid-template-columns: 1fr; }
+  h1 { margin-top: 32px; }
+  textarea, .cikti { min-height: 200px; }
+}
+</style>
+</head>
+<body>
+<header class="bant">
+  <!-- Gilyoş: kimlik kartlarındaki güvenlik baskısını anımsatan iç içe eğriler -->
+  <svg class="desen" aria-hidden="true" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1200 360">
+    <g fill="none" stroke="currentColor" stroke-width=".7" id="gilyos"></g>
+  </svg>
+  <div class="ic">
+    <div class="ust">
+      <div class="marka">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        kalkan
+      </div>
+      <div class="guvence">Metniniz bu sayfadan çıkmaz</div>
+    </div>
+    <h1>Kişisel veriyi modele göndermeden önce maskeleyin.</h1>
+    <p class="giris">Metninizi yazın. TC kimlik, IBAN, telefon, kart, ad-soyad ve diğer kişisel veriler tarayıcınızda çalışan Rust motoruyla bulunur ve yer tutucuyla değiştirilir. Modelin cevabı geldiğinde gerçek değerler geri konur.</p>
+  </div>
+</header>
+
+<main class="sayfa">
+  <div class="ayarlar">
+    <div>
+      <span class="alan-adi" id="strateji-adi">Değiştirme biçimi</span>
+      <div class="secim" role="group" aria-labelledby="strateji-adi" id="strateji">
+        <button type="button" data-s="token" aria-pressed="true">Yer tutucu</button>
+        <button type="button" data-s="sentetik" aria-pressed="false">Sahte ama geçerli</button>
+        <button type="button" data-s="kismi" aria-pressed="false">Kısmi</button>
+      </div>
+    </div>
+    <div class="terim">
+      <label for="terimler">Kurumunuza özel terimler (virgülle)</label>
+      <input type="text" id="terimler" value="Proje Atlas" autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+
+  <div class="ikili">
+    <section class="panel">
+      <div class="baslik"><h2><label for="girdi">Sizin metniniz</label></h2><span class="not">Düzenleyin, sonuç anında değişir</span></div>
+      <textarea id="girdi" spellcheck="false">Merhaba, ben Ayşe Kaya. T.C. kimlik numaram 10000000146, doğum tarihim 05.03.1990.
+İadeyi TR33 0006 1005 1978 6457 8413 26 hesabıma yapın; bana 0532 123 45 67 numarasından ulaşabilirsiniz.
+Proje Atlas kapsamındaki siparişim için ayse.kaya@ornek.com.tr adresine fatura kesilsin. Giriş IP'm 192.168.1.10.</textarea>
+    </section>
+    <section class="panel">
+      <div class="baslik"><h2>Modele giden</h2><span class="not" id="sure"></span></div>
+      <div class="cikti" id="cikti" aria-live="polite"></div>
+    </section>
+  </div>
+  <p class="durum" id="durum"></p>
+
+  <section class="adim" aria-labelledby="cevap-adi">
+    <h2 id="cevap-adi">Modelin cevabı geri geldiğinde</h2>
+    <p>Model yalnızca yer tutucuları görür. Cevabındaki yer tutucular kullanıcıya gösterilmeden önce gerçek değerlerle değiştirilir; cevap ayrıca modelin kendi ürettiği kişisel veri veya uydurduğu yer tutucu için denetlenir.</p>
+    <div class="ikili">
+      <div class="panel">
+        <div class="baslik"><h2><label for="cevap">Modelin cevabı</label></h2><span class="not">Deneyin: bir yer tutucuyu silin veya uydurun</span></div>
+        <textarea id="cevap" spellcheck="false"></textarea>
+      </div>
+      <div class="panel">
+        <div class="baslik"><h2>Kullanıcıya giden</h2></div>
+        <div class="cikti koyu" id="geri" aria-live="polite"></div>
+        <div class="denetim" id="denetim" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="adim" aria-labelledby="kasa-adi">
+    <h2 id="kasa-adi">Bu oturumun kasası</h2>
+    <p>Gerçek değerler yalnızca burada, bu sekmenin belleğinde tutulur. Sayfayı kapattığınızda silinir.</p>
+    <table>
+      <thead><tr><th scope="col">Yer tutucu</th><th scope="col">Gerçek değer</th></tr></thead>
+      <tbody id="kasa"></tbody>
+    </table>
+  </section>
+
+  <section class="adim" aria-labelledby="kur-adi">
+    <h2 id="kur-adi">Kendi projenizde kullanın</h2>
+    <p>Aynı motor; sunucuda, Python'da ve tarayıcıda aynı sonucu verir.</p>
+    <div class="kur">
+      <div><span>Python</span><pre>pip install kalkan</pre></div>
+      <div><span>Rust</span><pre>cargo add kalkan</pre></div>
+      <div><span>Komut satırı</span><pre>kalkan mask &lt; metin.txt</pre></div>
+    </div>
+  </section>
+
+  <div id="hata" hidden class="hata" role="alert"></div>
+  <footer>kalkan açık kaynaklıdır (MIT / Apache-2.0). Tespit sezgisel kurallara ve sağlama toplamlarına dayanır; her kişisel veriyi yakalayacağı garanti edilmez.</footer>
+</main>
+
+<script type="module">
+import { kalkanYukle } from "./kalkan.js"; /*__KALKAN_JS__*/
+
+// Gilyoş desenini çiz (iki frekanslı trokoidler).
+{
+  const g = document.getElementById("gilyos");
+  const NS = "http://www.w3.org/2000/svg";
+  for (let k = 0; k < 9; k++) {
+    let d = "";
+    for (let t = 0; t <= 1200; t += 4) {
+      const y = 180 + Math.sin(t / 61 + k * 0.7) * (70 + k * 9) + Math.sin(t / 17 + k) * 14;
+      d += (t ? "L" : "M") + t + " " + y.toFixed(1);
+    }
+    const p = document.createElementNS(NS, "path");
+    p.setAttribute("d", d);
+    g.appendChild(p);
+  }
+}
+
+const $ = (id) => document.getElementById(id);
+const kacis = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const TOKEN = /\[[A-Z_]+_\d+\]/g;
+
+let motor, oturum, strateji = "token", ilk = true;
+
+async function wasmKaynagi() {
+  const gomulu = "__KALKAN_WASM_B64__";
+  if (!gomulu.startsWith("__")) return Uint8Array.from(atob(gomulu), (c) => c.charCodeAt(0));
+  return new URL("./kalkan.wasm", import.meta.url);
+}
+
+function yenidenKur() {
+  if (oturum) oturum.kapat();
+  const terimler = $("terimler").value.split(",").map((s) => s.trim()).filter(Boolean);
+  oturum = motor.oturum({ strateji, terimler });
+}
+
+/** Metni, verilen aralıkları <mark> ile vurgulayarak HTML'e çevirir. */
+function vurgula(metin, araliklar, sinif = "") {
+  let html = "", son = 0;
+  for (const [s, e] of araliklar) {
+    html += kacis(metin.slice(son, s));
+    html += `<mark class="${sinif}${ilk ? " damga" : ""}">${kacis(metin.slice(s, e))}</mark>`;
+    son = e;
+  }
+  return html + kacis(metin.slice(son));
+}
+
+function maskele() {
+  yenidenKur();
+  const girdi = $("girdi").value;
+  const t0 = performance.now();
+  const bulunan = oturum.tespit(girdi);
+  const maskeli = oturum.maskele(girdi);
+  const ms = performance.now() - t0;
+
+  // Çıktıda değiştirilen bölgeleri bul: yer tutucular veya sahte/kısmi değerler.
+  const kasa = oturum.kasa();
+  let araliklar = [];
+  if (strateji === "kismi") {
+    araliklar = oturum.tespit(maskeli).map((e) => [e.start, e.end]);
+    // Kısmi maske tespit edilemeyebilir: yıldız içeren kelimeleri de işaretle.
+    for (const m of maskeli.matchAll(/\S*\*\S*/g)) araliklar.push([m.index, m.index + m[0].length]);
+    araliklar.sort((a, b) => a[0] - b[0]);
+    araliklar = araliklar.filter((r, i, a) => !i || r[0] >= a[i - 1][1]);
+  } else {
+    const anahtarlar = Object.keys(kasa).sort((a, b) => b.length - a.length);
+    for (const a of anahtarlar) {
+      let i = -1;
+      while ((i = maskeli.indexOf(a, i + 1)) !== -1) araliklar.push([i, i + a.length]);
+    }
+    araliklar.sort((a, b) => a[0] - b[0]);
+    araliklar = araliklar.filter((r, i, a) => !i || r[0] >= a[i - 1][1]);
+  }
+  $("cikti").innerHTML = vurgula(maskeli, araliklar);
+  ilk = false;
+
+  const turler = [...new Set(bulunan.map((e) => e.kind))];
+  $("durum").innerHTML = bulunan.length
+    ? `<span><strong>${bulunan.length}</strong> kişisel veri bulundu</span><span>${turler.map(kacis).join(", ")}</span>`
+    : `<span>Kişisel veri bulunmadı. Bir TC kimlik veya IBAN yazmayı deneyin.</span>`;
+  $("sure").textContent = `${ms < 1 ? ms.toFixed(2).replace(".", ",") : Math.round(ms)} ms, tarayıcıda`;
+
+  // Kasa tablosu
+  const satirlar = Object.entries(kasa);
+  $("kasa").innerHTML = satirlar.length
+    ? satirlar.map(([k, v]) => `<tr><td>${kacis(k)}</td><td>${kacis(v)}</td></tr>`).join("")
+    : `<tr><td colspan="2" class="bos">${strateji === "kismi" ? "Kısmi maskeleme geri yüklenemez; kasa tutulmaz." : "Henüz maskelenen değer yok."}</td></tr>`;
+
+  // Örnek model cevabı (kullanıcı düzenlemediyse)
+  if (!$("cevap").dataset.elle) {
+    const ad = Object.keys(kasa).find((k) => k.startsWith("[AD_SOYAD") ) || Object.keys(kasa)[0] || "";
+    const iban = Object.keys(kasa).find((k) => k.startsWith("[IBAN")) || "";
+    const tel = Object.keys(kasa).find((k) => k.startsWith("[TELEFON")) || "";
+    $("cevap").value = strateji === "token" && ad
+      ? `Merhaba ${ad}, iade talebiniz alındı. Tutar ${iban || "hesabınıza"} hesabına 3 iş günü içinde yatırılacak. Sorularınız için sizi ${tel || "telefonla"} üzerinden arayacağız.`
+      : maskeli;
+  }
+  geriYukle();
+}
+
+function geriYukle() {
+  const cevap = $("cevap").value;
+  const geri = oturum.geriYukle(cevap);
+  // Geri konan gerçek değerleri yeşil çerçeveyle göster.
+  const araliklar = [];
+  let i = 0, j = 0;
+  const kasa = oturum.kasa();
+  for (const m of cevap.matchAll(TOKEN)) {
+    if (!(m[0] in kasa)) continue;
+    const once = cevap.slice(i, m.index);
+    j += once.length;
+    araliklar.push([j, j + kasa[m[0]].length]);
+    j += kasa[m[0]].length;
+    i = m.index + m[0].length;
+  }
+  $("geri").innerHTML = strateji === "token" ? vurgula(geri, araliklar, "gercek") : kacis(geri);
+
+  const d = oturum.denetle(cevap);
+  const kutu = $("denetim");
+  kutu.classList.toggle("uyari", !d.clean);
+  if (d.clean) {
+    kutu.textContent = "Denetim temiz: cevapta modelin ürettiği yeni kişisel veri yok.";
+  } else {
+    const li = [
+      ...d.unknown_placeholders.map((t) => `<li><strong>${kacis(t)}</strong>: kasada karşılığı yok, model uydurmuş. Kullanıcıya ham hâliyle gider.</li>`),
+      ...d.new_pii.map((x) => `<li><strong>${kacis(x.text)}</strong>: modelin ürettiği yeni ${kacis(x.kind)}.</li>`),
+      ...d.echoed_originals.map((x) => `<li><strong>${kacis(x)}</strong>: gerçek değer cevapta görünüyor; bir yerde maskeleme atlanmış.</li>`),
+    ];
+    kutu.innerHTML = `Denetim uyarısı:<ul>${li.join("")}</ul>`;
+  }
+}
+
+try {
+  motor = await kalkanYukle(await wasmKaynagi());
+  maskele();
+} catch (e) {
+  $("hata").hidden = false;
+  $("hata").textContent = `Motor yüklenemedi: ${e.message}. Sayfayı bir web sunucusundan açtığınızdan ve kalkan.wasm dosyasının yanında olduğundan emin olun (wasm/build.sh).`;
+}
+
+let zamanlayici;
+const ertele = (f) => () => { clearTimeout(zamanlayici); zamanlayici = setTimeout(f, 60); };
+$("girdi").addEventListener("input", ertele(maskele));
+$("terimler").addEventListener("input", ertele(maskele));
+$("cevap").addEventListener("input", () => { $("cevap").dataset.elle = "1"; geriYukle(); });
+for (const b of $("strateji").querySelectorAll("button")) {
+  b.addEventListener("click", () => {
+    strateji = b.dataset.s;
+    for (const x of $("strateji").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+    delete $("cevap").dataset.elle;
+    maskele();
+  });
+}
+</script>
+</body>
+</html>
