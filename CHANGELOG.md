@@ -5,6 +5,24 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-18
+
+### Eklendi
+
+- Yeni Python tekerlekleri: Linux aarch64 (ARM sunucular), Alpine/musl Linux
+  (x86_64 ve aarch64) ve Intel macOS. Bu platformlarda kurulum artık Rust
+  derleyicisi gerektirmez.
+- Yayın otomasyonu: etiket ile sürümler uyuşmazsa yayın durur; tekerlekler
+  çalıştırılabilen platformlarda kurulup denenir; PyPI'den sonra crates.io da
+  token'sız (trusted publishing) yayımlanır; GitHub Release notları
+  CHANGELOG'dan oluşturulur.
+
+### Değiştirildi
+
+- PyPI ve crates.io sayfaları Türkçe README gösterir.
+- crates.io kategorileri: `text-processing`, `security`,
+  `command-line-utilities`, `wasm` (`privacy` crates.io'da yok).
+
 ## [0.3.0] - 2026-11-18
 
 ### Eklendi
