@@ -1,9 +1,9 @@
 [package]
 name = "kalkan"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.82"
-description = "Türkçe kişisel verileri (TCKN, VKN, IBAN, telefon, kart, plaka, ad-soyad) LLM'e gitmeden maskeleyen ve cevapta geri yükleyen, sıfır bağımlılıklı KVKK kalkanı."
+description = "Masks Turkish PII (national ID, tax ID, IBAN, phone, card, plate, names) before it reaches an LLM and restores it in the reply. Zero-dependency KVKK/GDPR shield."
 license = "MIT OR Apache-2.0"
 keywords = ["kvkk", "pii", "llm", "turkish", "anonymization"]
 categories = ["text-processing", "privacy"]

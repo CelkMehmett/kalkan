@@ -1,0 +1,44 @@
+name: Detection issue / Tespit hatası
+description: PII was missed or something that is not PII was masked. / Kişisel veri kaçtı ya da yanlışlıkla maskelendi.
+labels: ["detection"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Do not paste real personal data.** Replace real values with fake ones that keep the same
+        shape (e.g. TCKN `10000000146`, IBAN `TR33 0006 1005 1978 6457 8413 26`).
+        ⚠️ **Gerçek kişisel veri yapıştırmayın.** Aynı biçimde sahte değerler kullanın.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Type / Tür
+      options:
+        - Missed (false negative) / Kaçırıldı
+        - Wrongly masked (false positive) / Yanlış maskelendi
+        - Wrong restore / Yanlış geri yükleme
+    validations:
+      required: true
+  - type: input
+    id: entity
+    attributes:
+      label: Entity type / Veri türü
+      placeholder: TCKN, IBAN, TELEFON, AD_SOYAD, ...
+  - type: textarea
+    id: input
+    attributes:
+      label: Input text (fake data) / Girdi metni (sahte veri)
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual output / Beklenen ve gerçekleşen çıktı
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version & binding / Sürüm ve arayüz
+      placeholder: "0.2.0, Python 3.12"

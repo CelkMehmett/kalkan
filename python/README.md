@@ -1,10 +1,14 @@
 # kalkan (Python)
 
-Türkçe kişisel verileri (TC kimlik, IBAN, telefon, kart, ad-soyad, IP, doğum tarihi...) LLM'e
-gitmeden maskeleyen, cevapta geri yükleyen hızlı KVKK motoru. Rust ile yazılmıştır; saf Python
-regex çözümlerine göre tek çekirdekte yaklaşık 8 kat hızlıdır ve `mask_batch` ile tüm çekirdekleri kullanır.
+A fast PII shield for Turkish text: masks personal data (national ID, IBAN, phone, card, names,
+IP, date of birth, …) before it reaches an LLM and restores it in the reply. Built for KVKK
+(Turkey's GDPR counterpart). Written in Rust; about 8× faster than pure-Python regex solutions on
+a single core, and `mask_batch` uses all cores with the GIL released.
 
-## Kullanım
+> **Türkçe:** Türkçe kişisel verileri LLM'e gitmeden maskeleyen, cevapta geri yükleyen KVKK
+> motoru. Türkçe belgeler için [README.tr.md](https://github.com/CelkMehmett/kalkan/blob/main/README.tr.md).
+
+## Usage
 
 ```bash
 pip install kalkan
@@ -14,29 +18,31 @@ pip install kalkan
 import kalkan
 
 k = kalkan.Kalkan(terms=["Proje Atlas"])
-s = k.session()                       # her sohbet için bir oturum
+s = k.session()                        # one session per conversation
 
-istem = s.mask("Ayşe Kaya Hanım, TC 10000000146, Proje Atlas bütçesi")
+prompt = s.mask("Ayşe Kaya Hanım, TC 10000000146, Proje Atlas bütçesi")
 # "[AD_SOYAD_1] Hanım, TC [TCKN_1], [OZEL_1] bütçesi"
 
-cevap = llm(istem)
-rapor = s.audit(cevap)                # model yeni kişisel veri üretti mi?
-if not rapor:
-    log.warning(rapor)
-print(s.restore(cevap))
+reply = llm(prompt)
+report = s.audit(reply)                # did the model produce new PII?
+if not report:
+    log.warning(report)
+print(s.restore(reply))
 
-# Akış (streaming)
-akis = s.stream()
-for parca in llm_akisi(istem):
-    gonder(akis.push(parca))
-gonder(akis.finish())
+# Streaming
+stream = s.stream()
+for chunk in llm_stream(prompt):
+    send(stream.push(chunk))
+send(stream.finish())
 
-# Toplu anonimleştirme: tüm çekirdeklerde, GIL serbest
-temiz = kalkan.Kalkan(strategy="label").mask_batch(milyonlarca_kayit)
+# Batch anonymization: all cores, GIL released
+clean = kalkan.Kalkan(strategy="label").mask_batch(millions_of_records)
 ```
 
-`detect()` sonuçlarındaki `start`/`end` karakter indeksidir: `metin[e.start:e.end]` doğrudan çalışır.
-Kasa `s.vault` ile sözlük olarak alınır ve başka bir süreçte `import_vault` ile yüklenebilir.
+`start`/`end` in `detect()` results are character indices: `text[e.start:e.end]` works directly.
+The vault is available as a dict via `s.vault` and can be loaded in another process with `import_vault`.
 
+Full documentation, limitations and benchmarks:
+[github.com/CelkMehmett/kalkan](https://github.com/CelkMehmett/kalkan).
 
-Tüm özellikler, sınırlamalar ve ölçümler için projenin ana README dosyasına bakın.
+> kalkan is a helper, not a legal compliance guarantee. Detection is not 100%.

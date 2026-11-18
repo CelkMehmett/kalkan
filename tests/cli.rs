@@ -86,7 +86,7 @@ fn audit_reports_findings_and_exits_nonzero() {
 #[test]
 fn help_and_invalid_input() {
     assert!(stdout(&run(&["--help"], "")).contains("KULLANIM:"));
-    assert_eq!(stdout(&run(&["--version"], "")).trim(), "kalkan 0.2.0");
+    assert_eq!(stdout(&run(&["--version"], "")).trim(), concat!("kalkan ", env!("CARGO_PKG_VERSION")));
     assert!(stdout(&run(&[], "")).contains("kalkan —"));
     assert!(!run(&["mask", "-s", "yok"], "x").status.success());
     assert!(!run(&["yok"], "x").status.success());

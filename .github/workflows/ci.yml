@@ -18,14 +18,41 @@ jobs:
       - run: cargo doc --no-deps --all-features
       - run: test -f LICENSE-MIT && test -f LICENSE-APACHE
 
+  # Cargo.toml'daki rust-version iddiasını doğrular (Python bağlantısı hariç).
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.82
+      - run: cargo test --lib --tests -p kalkan
+      - run: cargo build --features ffi --lib -p kalkan
+
+  # Tekerlekler macOS ve Windows için de derlendiğinden çekirdek orada da sınanır.
+  platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test -p kalkan
+      - run: cargo test -p kalkan --features ffi --lib
+
   python:
+    strategy:
+      fail-fast: false
+      matrix:
+        # abi3 tekerleği: en düşük desteklenen ve en güncel sürüm.
+        python: ["3.9", "3.13"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
       - run: pip install maturin pytest
       - run: maturin build --release -m python/Cargo.toml -o dist
       - run: pip install dist/*.whl

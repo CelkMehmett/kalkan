@@ -5,9 +5,17 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-18
+
 ### Eklendi
 
-- CLI için uçtan uca testler (maskele → kasa → geri yükle, JSON, denetim çıkış kodu).
+- İngilizce README (`README.md`); Türkçe belge `README.tr.md` olarak taşındı.
+  crates.io ve PyPI sayfaları artık İngilizce.
+- `CODE_OF_CONDUCT.md`, issue şablonları (tespit hatası, hata, özellik), PR şablonu
+  ve Dependabot ayarı.
+- CI: MSRV (1.82) işi, macOS/Windows çekirdek testleri, Python 3.9 ve 3.13 matrisi.
+- CLI için uçtan uca testler (maskele → kasa → geri yükle, JSON, denetim çıkış kodu);
+  sürüm testi artık `Cargo.toml` sürümünü okur.
 
 ### Değiştirildi
 

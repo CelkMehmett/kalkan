@@ -1,0 +1,32 @@
+name: Bug report / Hata bildirimi
+description: Crash, wrong API behaviour, build or install problem. / Çökme, API hatası, kurulum sorunu.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "⚠️ Do not include real personal data. / Gerçek kişisel veri eklemeyin."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / Ne oldu?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction / En küçük yeniden üretim
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: binding
+    attributes:
+      label: Binding / Arayüz
+      options: [Rust, CLI, Python, WASM/JS, C ABI]
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Version, OS / Sürüm, işletim sistemi
+      placeholder: "kalkan 0.2.0, Ubuntu 24.04, rustc 1.90"

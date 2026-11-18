@@ -1,0 +1,20 @@
+name: Feature request / Özellik isteği
+description: New entity type, integration or API. / Yeni veri türü, entegrasyon veya API.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Sorun
+      description: What are you trying to do? / Ne yapmaya çalışıyorsunuz?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal / Öneri
+      description: For new entity types, describe the format and any checksum, with fake examples. / Yeni veri türleri için biçimi ve varsa sağlama algoritmasını sahte örneklerle yazın.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / Alternatifler

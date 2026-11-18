@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "kalkan"
-version = "0.2.0"
-description = "Türkçe kişisel verileri LLM'e gitmeden maskeleyen, cevapta geri yükleyen hızlı KVKK kalkanı (Rust)."
+version = "0.2.1"
+description = "Fast PII shield for Turkish text: masks personal data before it reaches an LLM and restores it in the reply (KVKK/GDPR, Rust)."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT OR Apache-2.0" }
@@ -14,6 +14,9 @@ classifiers = [
   "Programming Language :: Rust",
   "Programming Language :: Python :: 3",
   "Natural Language :: Turkish",
+  "Natural Language :: English",
+  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
   "Topic :: Security",
   "Topic :: Text Processing",
 ]
