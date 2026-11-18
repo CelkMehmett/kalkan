@@ -1,14 +1,11 @@
 # kalkan (Python)
 
-A fast PII shield for Turkish text: masks personal data (national ID, IBAN, phone, card, names,
-addresses, SGK numbers, IP, date of birth, …) before it reaches an LLM and restores it in the reply. Built for KVKK
-(Turkey's GDPR counterpart). Written in Rust; about 8× faster than pure-Python regex solutions on
-a single core, and `mask_batch` uses all cores with the GIL released.
+Türkçe kişisel verileri (TC kimlik, VKN, IBAN, telefon, kart, ad-soyad, adres, SGK sicil no, IP,
+doğum tarihi...) LLM'e gitmeden maskeleyen, cevapta geri yükleyen hızlı KVKK motoru. Rust ile
+yazılmıştır; saf Python regex çözümlerine göre tek çekirdekte yaklaşık 8 kat hızlıdır ve
+`mask_batch` GIL'i bırakarak tüm çekirdekleri kullanır.
 
-> **Türkçe:** Türkçe kişisel verileri LLM'e gitmeden maskeleyen, cevapta geri yükleyen KVKK
-> motoru. Türkçe belgeler için [README.tr.md](https://github.com/CelkMehmett/kalkan/blob/main/README.tr.md).
-
-## Usage
+## Kullanım
 
 ```bash
 pip install kalkan
@@ -18,42 +15,60 @@ pip install kalkan
 import kalkan
 
 k = kalkan.Kalkan(terms=["Proje Atlas"])
-s = k.session()                        # one session per conversation
+s = k.session()                       # her sohbet için bir oturum
 
-prompt = s.mask("Ayşe Kaya Hanım, TC 10000000146, Proje Atlas bütçesi")
+istem = s.mask("Ayşe Kaya Hanım, TC 10000000146, Proje Atlas bütçesi")
 # "[AD_SOYAD_1] Hanım, TC [TCKN_1], [OZEL_1] bütçesi"
 
-reply = llm(prompt)
-report = s.audit(reply)                # did the model produce new PII?
-if not report:
-    log.warning(report)
-print(s.restore(reply))
+cevap = llm(istem)
+rapor = s.audit(cevap)                # model yeni kişisel veri üretti mi?
+if not rapor:
+    log.warning(rapor)
+print(s.restore(cevap))
 
-# Streaming
-stream = s.stream()
-for chunk in llm_stream(prompt):
-    send(stream.push(chunk))
-send(stream.finish())
+# Akış (streaming)
+akis = s.stream()
+for parca in llm_akisi(istem):
+    gonder(akis.push(parca))
+gonder(akis.finish())
 
-# Batch anonymization: all cores, GIL released
-clean = kalkan.Kalkan(strategy="label").mask_batch(millions_of_records)
+# Toplu anonimleştirme: tüm çekirdeklerde, GIL serbest
+temiz = kalkan.Kalkan(strategy="label").mask_batch(milyonlarca_kayit)
 ```
 
-`start`/`end` in `detect()` results are character indices: `text[e.start:e.end]` works directly.
-The vault is available as a dict via `s.vault` and can be loaded in another process with `import_vault`.
+`detect()` sonuçlarındaki `start`/`end` karakter indeksidir: `metin[e.start:e.end]` doğrudan çalışır.
+Kasa `s.vault` ile sözlük olarak alınır ve başka bir süreçte `import_vault` ile yüklenebilir.
 
-## Integrations
+## Entegrasyonlar
 
 ```python
-from kalkan.messages import mask_messages                 # OpenAI SDK, no dependencies
+from kalkan.messages import mask_messages                 # OpenAI SDK, bağımlılıksız
 from kalkan.integrations.litellm import completion        # pip install "kalkan[litellm]"
-from kalkan.integrations.litellm import KalkanGuardrail   # LiteLLM Proxy guardrail
+from kalkan.integrations.litellm import KalkanGuardrail   # LiteLLM Proxy guardrail'i
 from kalkan.integrations.langchain import with_kalkan     # pip install "kalkan[langchain]"
 ```
 
-All of them restore streaming replies, even when a placeholder is split across chunks.
+Hepsi akış cevaplarını da geri yükler; yer tutucu parçalar arasında bölünse bile.
 
-Full documentation, limitations and benchmarks:
-[github.com/CelkMehmett/kalkan](https://github.com/CelkMehmett/kalkan).
+LiteLLM Proxy'de (`config.yaml`):
 
-> kalkan is a helper, not a legal compliance guarantee. Detection is not 100%.
+```yaml
+guardrails:
+  - guardrail_name: kalkan
+    litellm_params:
+      guardrail: kalkan.integrations.litellm.KalkanGuardrail
+      mode: [pre_call, post_call]
+      default_on: true
+```
+
+LangChain'de:
+
+```python
+model = with_kalkan(ChatOpenAI(model="gpt-4o"))
+zincir = prompt | model | StrOutputParser()
+```
+
+Tüm özellikler, sınırlamalar ve ölçümler için:
+[github.com/CelkMehmett/kalkan](https://github.com/CelkMehmett/kalkan/blob/main/README.tr.md).
+
+> kalkan bir yardımcı araçtır, hukuki uyum garantisi değildir. Tespit %100 değildir.
