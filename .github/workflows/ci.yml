@@ -45,8 +45,11 @@ jobs:
       fail-fast: false
       matrix:
         # abi3 tekerleği: en düşük desteklenen ve en güncel sürüm.
-        python: ["3.9", "3.13"]
-    runs-on: ubuntu-latest
+        # 3.9 için ubuntu-latest (26.04) imajında hazır Python yok.
+        include:
+          - { python: "3.9", os: ubuntu-24.04 }
+          - { python: "3.13", os: ubuntu-latest }
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
