@@ -4,7 +4,11 @@ use core::fmt;
 use core::ops::Range;
 
 /// Kalkan'ın tanıdığı kişisel veri türleri.
+///
+/// `#[non_exhaustive]`: yeni türler küçük sürümlerde eklenebilir; `match` ifadelerinde
+/// `_` kolu kullanın.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Kind {
     /// T.C. Kimlik Numarası (11 hane, iki sağlama hanesi doğrulanır).
     Tckn,
@@ -30,11 +34,15 @@ pub enum Kind {
     Passport,
     /// Kuruma özel terim (müşteri/proje adları vb.), kullanıcı tanımlı.
     Custom,
+    /// Posta adresi (mahalle/cadde/sokak + numara, ilçe/il, posta kodu).
+    Address,
+    /// SGK/SSK/Bağ-Kur sicil numarası (yalnızca bağlam kelimesiyle).
+    SocialSecurity,
 }
 
 impl Kind {
     /// Tüm türler.
-    pub const ALL: [Kind; 12] = [
+    pub const ALL: [Kind; 14] = [
         Kind::Tckn,
         Kind::Vkn,
         Kind::Iban,
@@ -47,6 +55,8 @@ impl Kind {
         Kind::BirthDate,
         Kind::Passport,
         Kind::Custom,
+        Kind::Address,
+        Kind::SocialSecurity,
     ];
 
     /// Maskede görünen etiket (ör. `[TCKN_1]`).
@@ -65,6 +75,8 @@ impl Kind {
             Kind::BirthDate => "DOGUM_TARIHI",
             Kind::Passport => "PASAPORT",
             Kind::Custom => "OZEL",
+            Kind::Address => "ADRES",
+            Kind::SocialSecurity => "SGK",
         }
     }
 
@@ -83,6 +95,8 @@ impl Kind {
             "DOGUM" | "BIRTHDATE" | "DOB" => Some(Kind::BirthDate),
             "PASSPORT" => Some(Kind::Passport),
             "CUSTOM" | "TERIM" => Some(Kind::Custom),
+            "ADDRESS" | "ADRES" => Some(Kind::Address),
+            "SSK" | "SGK_NO" | "SOCIAL_SECURITY" => Some(Kind::SocialSecurity),
             _ => None,
         })
     }

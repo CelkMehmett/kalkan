@@ -1,7 +1,7 @@
 # kalkan (Python)
 
 A fast PII shield for Turkish text: masks personal data (national ID, IBAN, phone, card, names,
-IP, date of birth, …) before it reaches an LLM and restores it in the reply. Built for KVKK
+addresses, SGK numbers, IP, date of birth, …) before it reaches an LLM and restores it in the reply. Built for KVKK
 (Turkey's GDPR counterpart). Written in Rust; about 8× faster than pure-Python regex solutions on
 a single core, and `mask_batch` uses all cores with the GIL released.
 

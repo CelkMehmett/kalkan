@@ -1,4 +1,4 @@
-//! IP adresi, doğum tarihi ve pasaport dedektörleri.
+//! IP adresi, doğum tarihi, pasaport ve SGK sicil no dedektörleri.
 
 use crate::entity::{Kind, Match};
 use crate::text::{boundary_after, boundary_before, context_has, eq_tr_ci};
@@ -6,6 +6,7 @@ use crate::text::{boundary_after, boundary_before, context_has, eq_tr_ci};
 const VERSION_WORDS: &[&str] = &["sürüm", "versiyon", "version", "ver.", "build", "release", "v."];
 const BIRTH_WORDS: &[&str] = &["doğum", "dogum", "d.tarihi", "d. tarihi", "d.t.", "doğ.", "birth", "dob"];
 const PASSPORT_WORDS: &[&str] = &["pasaport", "passport"];
+const SGK_WORDS: &[&str] = &["sgk", "ssk", "bağ-kur", "bağkur", "bag-kur", "bagkur", "emekli sicil", "sigorta sicil"];
 const MONTHS: &[&str] = &[
     "ocak", "şubat", "mart", "nisan", "mayıs", "haziran", "temmuz", "ağustos", "eylül", "ekim", "kasım", "aralık",
 ];
@@ -237,6 +238,36 @@ pub(crate) fn scan_passport(text: &str, out: &mut Vec<Match>) {
     }
 }
 
+// ---------------------------------------------------------------- SGK sicil no
+
+/// "SGK sicil no: 1234567890" — 6-13 haneli bitişik sayı, yalnızca SGK/SSK/Bağ-Kur
+/// bağlamıyla. Sağlaması olmadığından bağlam şarttır. Daha önce başka bir türle
+/// (ör. TCKN) eşleşen bölgeler atlanır.
+pub(crate) fn scan_social_security(text: &str, out: &mut Vec<Match>) {
+    let b = text.as_bytes();
+    let n = b.len();
+    let taken = out.len();
+    let mut i = 0;
+    while i < n {
+        let Some(off) = b[i..].iter().position(u8::is_ascii_digit) else { break };
+        i += off;
+        let mut j = i;
+        while j < n && b[j].is_ascii_digit() {
+            j += 1;
+        }
+        // Ucuz kontroller önce; bağlam araması yalnızca aday sayılar için.
+        if (6..=13).contains(&(j - i))
+            && boundary_before(text, i)
+            && boundary_after(text, j)
+            && !out[..taken].iter().any(|m| m.span.start < j && i < m.span.end)
+            && context_has(text, i, 32, SGK_WORDS)
+        {
+            out.push(Match::new(Kind::SocialSecurity, i..j, 85));
+        }
+        i = j;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +308,12 @@ mod tests {
     fn passport() {
         assert_eq!(run(scan_passport, "Pasaport No: U12345678"), ["U12345678"]);
         assert!(run(scan_passport, "Sipariş kodu U12345678").is_empty());
+    }
+
+    #[test]
+    fn social_security() {
+        assert_eq!(run(scan_social_security, "SGK sicil no: 3401234567"), ["3401234567"]);
+        assert_eq!(run(scan_social_security, "Bağ-Kur No 1234567, SSK 99887766"), ["1234567", "99887766"]);
+        assert!(run(scan_social_security, "Sipariş 3401234567, sicil 12345").is_empty());
     }
 }

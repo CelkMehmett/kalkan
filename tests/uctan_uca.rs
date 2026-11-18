@@ -422,3 +422,46 @@ fn stream_restorer_is_independent_of_session() {
     });
     assert_eq!(h.join().unwrap(), "Kayıt 10000000146 tamam");
 }
+
+// ---------------------------------------------------------------- adres ve SGK
+
+#[test]
+fn address_and_social_security() {
+    let t = "Teslimat adresi: Caferağa Mah. Moda Cad. No:12/3 Kadıköy/İstanbul. \
+             SGK sicil no: 3401234567, SGK no: 10000000146. Bağdat Caddesi'nde trafik var.";
+    assert_eq!(
+        found(t),
+        vec![
+            (Kind::Address, "Caferağa Mah. Moda Cad. No:12/3 Kadıköy/İstanbul".into()),
+            (Kind::SocialSecurity, "3401234567".into()),
+            // SGK numarası TCKN ile aynıysa TCKN olarak etiketlenir (sağlaması tutar).
+            (Kind::Tckn, "10000000146".into()),
+        ]
+    );
+
+    let mut s = Kalkan::new().session();
+    let m = s.mask(t);
+    assert!(m.starts_with("Teslimat adresi: [ADRES_1]. SGK sicil no: [SGK_1], SGK no: [TCKN_1]."), "{m}");
+    assert!(m.ends_with("Bağdat Caddesi'nde trafik var."), "{m}");
+    assert_eq!(s.restore(&m), t);
+
+    // Akışta yer tutucu bölünse bile geri yüklenir.
+    let mut st = s.stream();
+    let out = st.push("Kargo [ADR") + &st.push("ES_1] adresine çıktı.") + &st.finish();
+    assert_eq!(out, "Kargo Caferağa Mah. Moda Cad. No:12/3 Kadıköy/İstanbul adresine çıktı.");
+}
+
+#[test]
+fn address_strategies() {
+    let t = "Adres: Kızılay Mah. Atatürk Blv. No:101/7 Çankaya/Ankara";
+    let partial = Kalkan::builder().strategy(Strategy::Partial).build().mask(t);
+    assert_eq!(partial, "Adres: *** Çankaya/Ankara");
+
+    let mut s = Kalkan::builder().strategy(Strategy::Synthetic).build().session();
+    let masked = s.mask(t);
+    assert!(!masked.contains("Kızılay") && !masked.contains("101/7"), "{masked}");
+    assert!(s.audit(&masked).is_clean(), "{:?}", s.audit(&masked));
+    assert_eq!(s.restore(&masked), t);
+
+    assert!(Kalkan::builder().kinds([Kind::Tckn]).build().detect(t).is_empty());
+}

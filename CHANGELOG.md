@@ -5,9 +5,22 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 
 ## [Unreleased]
 
-## [0.2.1] - 2026-11-18
+## [0.3.0] - 2026-11-18
 
 ### Eklendi
+
+- `Kind::Address` (`ADRES`): mahalle/cadde/sokak/bulvar çapalı Türkçe posta adresi
+  tespiti; `No:`, kat/daire, blok, posta kodu, `İlçe/İl` ve 81 il adı. Tek başına
+  cadde adı (mekân) maskelenmez. Kısmi modda il/ilçe kalır, sentetik modda sahte adres.
+- `Kind::SocialSecurity` (`SGK`): SGK/SSK/Bağ-Kur sicil numarası, yalnızca bağlamla.
+
+### Değiştirildi
+
+- **Kırıcı:** `Kind` artık `#[non_exhaustive]`; `Kind::ALL` 14 elemanlı. Bundan
+  sonraki türler küçük sürümlerde kırılma olmadan eklenebilir.
+- Yeni dedektörler tespit süresini ölçüm derleminde yaklaşık %14 artırır.
+
+### Eklendi (proje altyapısı)
 
 - İngilizce README (`README.md`); Türkçe belge `README.tr.md` olarak taşındı.
   crates.io ve PyPI sayfaları artık İngilizce.
@@ -17,7 +30,7 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 - CLI için uçtan uca testler (maskele → kasa → geri yükle, JSON, denetim çıkış kodu);
   sürüm testi artık `Cargo.toml` sürümünü okur.
 
-### Değiştirildi
+### Düzeltildi
 
 - FFI tutamaçları serbest bırakılan yuvaları yeniden kullanır; uzun süreli
   süreçlerde tutamaç listesi büyümez.

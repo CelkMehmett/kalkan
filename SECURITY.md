@@ -20,8 +20,8 @@ herkese açık bir issue olarak **paylaşmayın**.
   panik, bellek bozulması ve veri sızıntısı
 - Sentetik değerlerin gerçek değer hakkında bilgi taşıması
 
-Kapsam dışı: kalkan'ın kapsamadığı veri türleri (adres, sağlık verisi, SGK no),
-sezgisel ad tespitinin kaçırdığı isimler ve kullanıcının kasa dosyasını güvensiz
+Kapsam dışı: kalkan'ın kapsamadığı veri türleri (sağlık verisi vb.),
+sezgisel ad ve adres tespitinin kaçırdığı değerler ve kullanıcının kasa dosyasını güvensiz
 bir yerde saklaması. Bunlar README "Sınırlamalar" ve "Güvenlik modeli"
 bölümlerinde açıklanır.
 

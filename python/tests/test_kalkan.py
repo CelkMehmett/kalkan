@@ -49,6 +49,15 @@ def test_partial_and_label():
     assert kalkan.Kalkan(strategy="label").mask("TC 10000000146") == "TC [TCKN]"
 
 
+def test_address_and_sgk():
+    s = kalkan.Kalkan().session()
+    t = "Adres: Moda Cad. No:12 Kadıköy/İstanbul, SGK sicil no: 3401234567"
+    m = s.mask(t)
+    assert m == "Adres: [ADRES_1], SGK sicil no: [SGK_1]"
+    assert s.restore(m) == t
+    assert {"ADRES", "SGK"} <= set(kalkan.KINDS)
+
+
 def test_kinds_exclude_terms():
     assert kalkan.Kalkan(kinds=["EPOSTA"]).mask("a@b.com 10000000146") == "[EPOSTA_1] 10000000146"
     assert kalkan.Kalkan(exclude=["TCKN"]).mask("10000000146") == "10000000146"

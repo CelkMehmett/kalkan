@@ -1,6 +1,6 @@
 [package]
 name = "kalkan"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.82"
 description = "Masks Turkish PII (national ID, tax ID, IBAN, phone, card, plate, names) before it reaches an LLM and restores it in the reply. Zero-dependency KVKK/GDPR shield."

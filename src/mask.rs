@@ -203,11 +203,11 @@ fn normalize(kind: Kind, s: &str) -> String {
             // Ulusal 10 haneli çekirdek: +90 / 0090 / 0 önekini at.
             d[d.len().saturating_sub(10)..].to_string()
         }
-        Kind::Tckn | Kind::Vkn | Kind::Card | Kind::Iban => digits_of(s),
+        Kind::Tckn | Kind::Vkn | Kind::Card | Kind::Iban | Kind::SocialSecurity => digits_of(s),
         Kind::Email => s.to_ascii_lowercase(),
         Kind::Plate => s.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_ascii_uppercase(),
         Kind::Name | Kind::BirthDate => tr_lower(&s.split_whitespace().collect::<Vec<_>>().join(" ")),
-        Kind::Custom => crate::text::fold(&s.split_whitespace().collect::<Vec<_>>().join(" ")),
+        Kind::Custom | Kind::Address => crate::text::fold(&s.split_whitespace().collect::<Vec<_>>().join(" ")),
         Kind::Ip => s.to_ascii_lowercase(),
         Kind::Passport => s.to_ascii_uppercase(),
     }
@@ -235,7 +235,15 @@ fn mask_alnum_except_last(s: &str, keep: usize, keep_letters: bool) -> String {
 
 fn partial(kind: Kind, s: &str) -> String {
     match kind {
-        Kind::Tckn | Kind::Vkn | Kind::Phone => mask_alnum_except_last(s, 2, true),
+        Kind::Tckn | Kind::Vkn | Kind::Phone | Kind::SocialSecurity => mask_alnum_except_last(s, 2, true),
+        Kind::Address => {
+            // Yalnızca il/ilçe kalır: "... No:5 Kadıköy/İstanbul" → "*** Kadıköy/İstanbul"
+            let tail = s.rsplit([' ', ',']).next().filter(|t| t.contains('/') && t.chars().any(char::is_alphabetic));
+            match tail {
+                Some(t) => format!("*** {t}"),
+                None => "***".into(),
+            }
+        }
         Kind::Card | Kind::Iban => mask_alnum_except_last(s, 4, true),
         Kind::Email => match s.split_once('@') {
             Some((local, domain)) => {
@@ -431,6 +439,16 @@ fn synthetic(kind: Kind, original: &str, norm: &str, secret: u64, attempt: u64) 
             format!("{first}{digits}")
         }
         Kind::Custom => format!("OZEL_{:06x}", rng.next() & 0xFF_FFFF),
+        Kind::SocialSecurity => rng.digits(original.len()).into_iter().map(char::from).collect(),
+        Kind::Address => {
+            const MAH: [&str; 6] = ["Örnek", "Yeni", "Merkez", "Cumhuriyet", "Bahçe", "Lale"];
+            format!(
+                "{} Mah. {}. Sok. No:{}",
+                MAH[rng.below(MAH.len() as u64) as usize],
+                1 + rng.below(1999),
+                1 + rng.below(150)
+            )
+        }
         Kind::Name => {
             let words: Vec<&str> = original.split_whitespace().collect();
             let upper = original.chars().filter(|c| c.is_alphabetic()).all(char::is_uppercase);

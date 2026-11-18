@@ -47,7 +47,7 @@ tarayıcı eklentinizin veya toplu veri temizleme işinizin içine koyarsınız.
 
 | | |
 |---|---|
-| **12 veri türü** | TCKN, VKN, IBAN, telefon, kart, e-posta, plaka, ad-soyad, IP, doğum tarihi, pasaport, kuruma özel terimler |
+| **14 veri türü** | TCKN, VKN, IBAN, telefon, kart, e-posta, plaka, ad-soyad, adres, SGK sicil no, IP, doğum tarihi, pasaport, kuruma özel terimler |
 | **Sağlama doğrulaması** | TCKN, VKN, IBAN (mod-97), kart (Luhn); tarih, fiyat, sipariş no, sürüm numarası yakalanmaz |
 | **Geri yükleme** | Oturum kasası; aynı değerin farklı yazımları aynı token'ı alır |
 | **Akış (streaming)** | Yer tutucu iki parçaya bölünse bile (`"[TC"` + `"KN_1]"`) doğru geri yükler |
@@ -88,6 +88,8 @@ cargo test --workspace --exclude kalkan-py
 | IP | `IP` | IPv4 (oktet ≤ 255) ve IPv6; saat (`14:30:00`), MAC ve sürüm numaraları elenir |
 | Doğum tarihi | `DOGUM_TARIHI` | `05.03.1990`, `1990-03-05`, `5 Mart 1990`; yalnızca "doğum" bağlamıyla, takvim doğrulamalı |
 | Pasaport | `PASAPORT` | Harf + 7-8 hane, yalnızca "pasaport" bağlamıyla |
+| Adres | `ADRES` | Önünde ad veya sayı olan `Mah.`, `Cad.`, `Sok.`, `Blv.` çapası; ardından `No:`, kat/daire, posta kodu, `İlçe/İl`. Tek başına cadde adı (`Bağdat Caddesi`) maskelenmez |
+| SGK sicil no | `SGK` | 6-13 hane, yalnızca "SGK/SSK/Bağ-Kur" bağlamıyla; geçerli TCKN ise `TCKN` kalır |
 | Özel terim | `OZEL` | Sizin verdiğiniz liste |
 
 ## Python
@@ -196,7 +198,7 @@ kalkan restore -v kasa.tsv < cevap.txt
 
 Üç birim birbirine karıştırılmamalı: Rust'ta `&metin[m.span]` çalışır, Python'da
 `metin[e.start:e.end]`, JS'te `metin.slice(e.start, e.end)` çalışır. Bayt konumlarını
-dorudan JS/Python dizgisine vermeyin.
+doğrudan JS/Python dizgisine vermeyin.
 
 Oturum (`Session`) kasası **tek kullanımlıktır**: her sohbet/istek için yeni bir
 oturum açın. Aynı değerin farklı yazımları aynı yer tutucuyu alır ve ilk görülen
@@ -208,7 +210,8 @@ ise ondan sonra.
 5 MB'lık, 11.617 mesajlık Türkçe müşteri destek derlemi (`bench/gen_corpus.py` ile üretilir, her
 mesajın doğru etiketleri bilinir). Karşılaştırma: [kvkk-pii](https://pypi.org/project/kvkk-pii/)
 **yalnızca regex katmanı** ile (model yok; adil kıyas için kişi adı kuralı eklendi).
-Ortam: 2 çekirdekli Intel Xeon 2.1 GHz sanal makine. kalkan'ın 12 türünün tamamı açık.
+Ortam: 2 çekirdekli Intel Xeon 2.1 GHz sanal makine. kalkan v0.2'nin 12 türü açık (v0.3'te eklenen adres
+ve SGK dedektörleri tespit süresini yaklaşık %14 artırır).
 
 | | kalkan | kvkk-pii (regex) |
 |---|---|---|
@@ -263,7 +266,9 @@ Güvenlik açığı bildirimi için [SECURITY.md](SECURITY.md) dosyasına bakın
 
 - **Adlar sezgisel.** Unvan, hitap, form etiketi veya sözlükteki bir ad + soyad yoksa ad kaçabilir
   (ör. `Gülizar Tunç geldi`). Serbest metinde yüksek isabet için bir NER modeliyle birlikte kullanın.
-- **Adres, SGK no ve özel nitelikli veriler (sağlık, din vb.) yok.**
+- **Adresler sezgisel.** `Mah./Cad./Sok./Blv.` çapası olmayan adresler (ör. `Kadıköy'de oturuyorum`,
+  köy adresleri) kaçar. SGK numarasının sağlaması yoktur, bağlam kelimesi gerekir.
+- **Özel nitelikli veriler (sağlık, din vb.) yok.**
 - `Synthetic` modda model sahte değeri yeniden biçimlendirirse (ör. boşlukları silerse) geri yükleme
   o değeri tanımaz. Kritik akışlarda `Token` kullanın.
 - Aynı değerin farklı yazımları (`0532 123 45 67` / `+905321234567`, `ACME` / `Acme`) bilerek aynı

@@ -30,7 +30,7 @@ SEÇENEKLER:
   -s, --strategy <S>     token (varsayılan) | synthetic | partial | label
   -v, --vault <DOSYA>    mask: kasayı yaz; restore: kasayı oku (TSV)
   -k, --kinds <LİSTE>    yalnızca bu türler: tckn,vkn,iban,telefon,eposta,kart,plaka,
-                         ad_soyad,ip,dogum_tarihi,pasaport,ozel
+                         ad_soyad,ip,dogum_tarihi,pasaport,ozel,adres,sgk
   -t, --terms <LİSTE>    kuruma özel terimler, virgülle: 'Proje Atlas,Acme Holding'
       --terms-file <D>   kuruma özel terimler, satır başına bir tane
   -c, --min-confidence <N>  güven eşiği 0-100 (varsayılan 70)

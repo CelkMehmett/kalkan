@@ -80,6 +80,7 @@ test("terimler, denetim, türler", () => {
   expect(d.unknown_placeholders).toEqual(["[TCKN_4]"]);
   expect(d.new_pii).toEqual([{ kind: "TELEFON", text: "0212 444 55 66" }]);
   expect(motor.turler()).toContain("DOGUM_TARIHI");
+  expect(motor.turler()).toEqual(expect.arrayContaining(["ADRES", "SGK"]));
   o.kapat();
 });
 
