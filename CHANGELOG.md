@@ -9,6 +9,13 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 
 ### Eklendi
 
+- `kalkan.messages`: OpenAI biçimli mesaj listelerini (çok parçalı içerik, araç
+  çağrısı argümanları dahil) maskeleme/geri yükleme; bağımlılıksız.
+- `kalkan.integrations.litellm`: `completion`/`acompletion` sarmalayıcıları ve
+  LiteLLM Proxy için `KalkanGuardrail` (akış dahil; kasa metadata'ya yazılmaz).
+- `kalkan.integrations.langchain`: her Runnable'ı saran `with_kalkan`
+  (`invoke`/`ainvoke`/`stream`/`astream`, araç çağrıları, `on_leak` denetimi).
+- Python ekstraları: `kalkan[litellm]`, `kalkan[langchain]`.
 - `Kind::Address` (`ADRES`): mahalle/cadde/sokak/bulvar çapalı Türkçe posta adresi
   tespiti; `No:`, kat/daire, blok, posta kodu, `İlçe/İl` ve 81 il adı. Tek başına
   cadde adı (mekân) maskelenmez. Kısmi modda il/ilçe kalır, sentetik modda sahte adres.

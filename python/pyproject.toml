@@ -21,6 +21,11 @@ classifiers = [
   "Topic :: Text Processing",
 ]
 
+[project.optional-dependencies]
+# Sürüm alt sınırı konmadı; testler litellm 1.110 ve langchain-core 1.7 ile yapıldı.
+litellm = ["litellm"]
+langchain = ["langchain-core"]
+
 [project.urls]
 Repository = "https://github.com/CelkMehmett/kalkan"
 Documentation = "https://docs.rs/kalkan"

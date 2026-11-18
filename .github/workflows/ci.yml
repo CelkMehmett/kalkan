@@ -59,6 +59,9 @@ jobs:
       - run: pip install maturin pytest
       - run: maturin build --release -m python/Cargo.toml -o dist
       - run: pip install dist/*.whl
+      # Entegrasyon testleri yalnızca güncel Python'da (3.9'da atlanır, importorskip).
+      - if: matrix.python == '3.13'
+        run: pip install litellm langchain-core
       - run: pytest -q python/tests
 
   javascript:

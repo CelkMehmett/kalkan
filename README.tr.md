@@ -24,6 +24,7 @@ yüklemez; tüm kaynaklar tek dosyanın içindedir.
 - [Kurulum](#kurulum)
 - [Python](#python)
 - [Rust](#rust)
+- [Entegrasyonlar: OpenAI, LiteLLM, LangChain](#entegrasyonlar)
 - [Tarayıcı (WebAssembly)](#tarayıcı-webassembly)
 - [Stratejiler](#stratejiler)
 - [Komut satırı](#komut-satırı)
@@ -151,6 +152,63 @@ gonder(&akis.finish());
 ```
 
 Çalışan örnek: `cargo run --example llm_akisi`
+
+## Entegrasyonlar
+
+Hazır adaptörler istemi maskeler, cevabı (yer tutucu parçalar arasında bölünse bile akış dahil)
+geri yükler; oturumları elle yönetmeniz gerekmez. Her çağrı kendi oturumunu alır, kasa süreç
+belleğinde kalır.
+
+**OpenAI biçimli mesajlar (bağımlılıksız)** — OpenAI SDK'sı veya herhangi bir `messages` listesi:
+
+```python
+from kalkan.messages import mask_messages
+
+s = kalkan.Kalkan().session()
+cevap = client.chat.completions.create(model="gpt-4o", messages=mask_messages(s, mesajlar))
+print(s.restore(cevap.choices[0].message.content))
+```
+
+Çok parçalı içerik ve araç çağrısı argümanları da işlenir; argümanlar JSON olarak ayrıştırılır,
+geri yüklenen değer JSON'u bozmaz.
+
+**LiteLLM** (`pip install "kalkan[litellm]"`) — `litellm.completion`/`acompletion` yerine:
+
+```python
+from kalkan.integrations.litellm import completion
+
+r = completion(model="gpt-4o", messages=[{"role": "user", "content": "TC 10000000146"}])
+for parca in completion(model="gpt-4o", messages=..., stream=True): ...
+```
+
+veya ağ geçidinin arkasındaki tüm uygulamaları korumak için **LiteLLM Proxy guardrail'i**:
+
+```yaml
+guardrails:
+  - guardrail_name: kalkan
+    litellm_params:
+      guardrail: kalkan.integrations.litellm.KalkanGuardrail
+      mode: [pre_call, post_call]
+      default_on: true
+      # isteğe bağlı: strategy, terms, kinds, exclude, min_confidence
+```
+
+Kasa istek metadata'sına veya LiteLLM loglarına yazılmaz (yalnızca anlamsız bir kimlik).
+Not: `--detailed_debug` açıkken proxy, guardrail'den önce gelen isteği kendisi loglar.
+
+**LangChain** (`pip install "kalkan[langchain]"`) — her Runnable'ı veya sohbet modelini sarar:
+
+```python
+from kalkan.integrations.langchain import with_kalkan
+
+model = with_kalkan(ChatOpenAI(model="gpt-4o"), on_leak=lambda rapor: log.warning(rapor))
+zincir = prompt | model | StrOutputParser()
+zincir.invoke({"soru": "Ben Ayşe Kaya, TC 10000000146 ..."})
+```
+
+`invoke`, `ainvoke`, `stream`, `astream` desteklenir; araç çağrısı argümanları da geri yüklenir.
+Model yeni kişisel veri üretirse `on_leak` denetim raporuyla çağrılır.
+LiteLLM 1.110 (SDK ve gerçek proxy) ve langchain-core 1.7 ile test edildi.
 
 ## Tarayıcı (WebAssembly)
 

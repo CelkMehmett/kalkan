@@ -42,6 +42,17 @@ clean = kalkan.Kalkan(strategy="label").mask_batch(millions_of_records)
 `start`/`end` in `detect()` results are character indices: `text[e.start:e.end]` works directly.
 The vault is available as a dict via `s.vault` and can be loaded in another process with `import_vault`.
 
+## Integrations
+
+```python
+from kalkan.messages import mask_messages                 # OpenAI SDK, no dependencies
+from kalkan.integrations.litellm import completion        # pip install "kalkan[litellm]"
+from kalkan.integrations.litellm import KalkanGuardrail   # LiteLLM Proxy guardrail
+from kalkan.integrations.langchain import with_kalkan     # pip install "kalkan[langchain]"
+```
+
+All of them restore streaming replies, even when a placeholder is split across chunks.
+
 Full documentation, limitations and benchmarks:
 [github.com/CelkMehmett/kalkan](https://github.com/CelkMehmett/kalkan).
 

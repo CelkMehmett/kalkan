@@ -31,6 +31,7 @@ CDNs or analytics.
 - [Installation](#installation)
 - [Python](#python)
 - [Rust](#rust)
+- [Integrations: OpenAI, LiteLLM, LangChain](#integrations)
 - [Browser (WebAssembly)](#browser-webassembly)
 - [Strategies](#strategies)
 - [Command line](#command-line)
@@ -158,6 +159,63 @@ send(&stream.finish());
 ```
 
 Runnable example: `cargo run --example llm_akisi`
+
+## Integrations
+
+Ready-made adapters mask the prompt and restore the reply (including streaming, with
+placeholders split across chunks) so you don't have to wire sessions yourself. Every call gets
+its own session; the vault stays in process memory.
+
+**OpenAI-style messages (no dependencies)** — works with the OpenAI SDK or any `messages` list:
+
+```python
+from kalkan.messages import mask_messages
+
+s = kalkan.Kalkan().session()
+reply = client.chat.completions.create(model="gpt-4o", messages=mask_messages(s, messages))
+print(s.restore(reply.choices[0].message.content))
+```
+
+Text parts and tool-call arguments are handled; arguments are parsed as JSON so restored values
+never break the JSON.
+
+**LiteLLM** (`pip install "kalkan[litellm]"`) — drop-in for `litellm.completion`/`acompletion`:
+
+```python
+from kalkan.integrations.litellm import completion
+
+r = completion(model="gpt-4o", messages=[{"role": "user", "content": "TC 10000000146"}])
+for chunk in completion(model="gpt-4o", messages=..., stream=True): ...
+```
+
+or as a **LiteLLM Proxy guardrail** in `config.yaml`, protecting every app behind the gateway:
+
+```yaml
+guardrails:
+  - guardrail_name: kalkan
+    litellm_params:
+      guardrail: kalkan.integrations.litellm.KalkanGuardrail
+      mode: [pre_call, post_call]
+      default_on: true
+      # optional: strategy, terms, kinds, exclude, min_confidence
+```
+
+The vault is never written to request metadata or LiteLLM logs (only an opaque id is). Note that
+with `--detailed_debug` the proxy itself logs the incoming request before guardrails run.
+
+**LangChain** (`pip install "kalkan[langchain]"`) — wraps any Runnable or chat model:
+
+```python
+from kalkan.integrations.langchain import with_kalkan
+
+model = with_kalkan(ChatOpenAI(model="gpt-4o"), on_leak=lambda report: log.warning(report))
+chain = prompt | model | StrOutputParser()
+chain.invoke({"question": "Ben Ayşe Kaya, TC 10000000146 ..."})
+```
+
+`invoke`, `ainvoke`, `stream` and `astream` are supported; tool-call arguments are restored too.
+`on_leak` is called with the `audit` report if the model produces new personal data.
+Tested with LiteLLM 1.110 (SDK and a real proxy) and langchain-core 1.7.
 
 ## Browser (WebAssembly)
 
