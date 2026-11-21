@@ -1,12 +1,16 @@
 //! IP adresi, doğum tarihi, pasaport ve SGK sicil no dedektörleri.
 
 use crate::entity::{Kind, Match};
-use crate::text::{boundary_after, boundary_before, context_has, eq_tr_ci};
+use crate::text::{boundary_after, boundary_before, context_after_has, context_has, eq_tr_ci};
 
 const VERSION_WORDS: &[&str] = &["sürüm", "versiyon", "version", "ver.", "build", "release", "v."];
 const BIRTH_WORDS: &[&str] = &["doğum", "dogum", "d.tarihi", "d. tarihi", "d.t.", "doğ.", "birth", "dob"];
 const PASSPORT_WORDS: &[&str] = &["pasaport", "passport"];
 const SGK_WORDS: &[&str] = &["sgk", "ssk", "bağ-kur", "bağkur", "bag-kur", "bagkur", "emekli sicil", "sigorta sicil"];
+/// Numaradan sonra gelen SGK bağlamı: "84883037 numaralı SGK sicil", "85387200 sicil numaralı".
+const SGK_AFTER_WORDS: &[&str] = &["sgk", "ssk", "bağ-kur", "bagkur", "bağkur", "sicil"];
+/// Tarihten sonra gelen doğum bağlamı: "12.03.1990 doğumlu".
+const BIRTH_AFTER_WORDS: &[&str] = &["doğumlu", "dogumlu", "doğum", "dogum"];
 const MONTHS: &[&str] = &[
     "ocak", "şubat", "mart", "nisan", "mayıs", "haziran", "temmuz", "ağustos", "eylül", "ekim", "kasım", "aralık",
 ];
@@ -134,7 +138,8 @@ pub(crate) fn scan_birth_date(text: &str, out: &mut Vec<Match>) {
             continue;
         }
         if let Some(end) = numeric_date(b, i).or_else(|| textual_date(text, i)) {
-            if boundary_after(text, end) && context_has(text, i, 40, BIRTH_WORDS) {
+            let ctx = context_has(text, i, 60, BIRTH_WORDS) || context_after_has(text, end, 16, BIRTH_AFTER_WORDS);
+            if boundary_after(text, end) && ctx && !in_future(b, i, end) {
                 out.push(Match::new(Kind::BirthDate, i..end, 90));
                 i = end;
                 continue;
@@ -144,6 +149,41 @@ pub(crate) fn scan_birth_date(text: &str, out: &mut Vec<Match>) {
             i += 1;
         }
     }
+}
+
+/// Doğum tarihi gelecekte olamaz: "teslimat 19.03.2027" gibi tarihleri eler.
+/// Saat erişimi olmayan hedeflerde (wasm) denetim yapılmaz.
+fn in_future(b: &[u8], s: usize, e: usize) -> bool {
+    let year = b[s..e]
+        .windows(4)
+        .enumerate()
+        .filter(|(k, w)| {
+            w.iter().all(u8::is_ascii_digit)
+                && (*k == 0 || !b[s + k - 1].is_ascii_digit())
+                && b.get(s + k + 4).is_none_or(|c| !c.is_ascii_digit())
+        })
+        .map(|(_, w)| w.iter().fold(0u32, |a, &d| a * 10 + (d - b'0') as u32))
+        .next();
+    matches!((year, current_year()), (Some(y), Some(c)) if y > c)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn current_year() -> Option<u32> {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
+    // Gregoryen takvimde gün sayısından yıl (H. Hinnant, civil_from_days).
+    let z = (secs / 86_400) as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    Some((yoe + era * 400 + i64::from(m <= 2)) as u32)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn current_year() -> Option<u32> {
+    None
 }
 
 fn read_num(b: &[u8], i: usize, min: usize, max: usize) -> Option<(u32, usize)> {
@@ -220,20 +260,26 @@ fn textual_date(text: &str, i: usize) -> Option<usize> {
 
 // ---------------------------------------------------------------- Pasaport
 
-/// "Pasaport no: U12345678" — bir büyük harf + 7-8 hane, bağlam kelimesiyle.
+/// "Pasaport no: U12345678", "pasaport hj2212636" — 1-2 harf + 7-8 hane, bağlam kelimesiyle.
+/// Harfler aynı büyüklükte olmalı; Türk pasaportu tek harfli, yabancılar çoğunlukla iki harfli.
 pub(crate) fn scan_passport(text: &str, out: &mut Vec<Match>) {
     let b = text.as_bytes();
     let n = b.len();
     for i in 0..n.saturating_sub(7) {
-        if !b[i].is_ascii_uppercase() || !boundary_before(text, i) {
+        if !b[i].is_ascii_alphabetic() || !boundary_before(text, i) {
             continue;
         }
-        let mut j = i + 1;
+        let upper = b[i].is_ascii_uppercase();
+        let mut d = i + 1;
+        if d < n && b[d].is_ascii_alphabetic() && b[d].is_ascii_uppercase() == upper {
+            d += 1;
+        }
+        let mut j = d;
         while j < n && b[j].is_ascii_digit() {
             j += 1;
         }
-        if (7..=8).contains(&(j - i - 1)) && boundary_after(text, j) && context_has(text, i, 48, PASSPORT_WORDS) {
-            out.push(Match::new(Kind::Passport, i..j, 90));
+        if (7..=8).contains(&(j - d)) && boundary_after(text, j) && context_has(text, i, 48, PASSPORT_WORDS) {
+            out.push(Match::new(Kind::Passport, i..j, if upper && d == i + 1 { 90 } else { 85 }));
         }
     }
 }
@@ -260,7 +306,7 @@ pub(crate) fn scan_social_security(text: &str, out: &mut Vec<Match>) {
             && boundary_before(text, i)
             && boundary_after(text, j)
             && !out[..taken].iter().any(|m| m.span.start < j && i < m.span.end)
-            && context_has(text, i, 32, SGK_WORDS)
+            && (context_has(text, i, 32, SGK_WORDS) || context_after_has(text, j, 24, SGK_AFTER_WORDS))
         {
             out.push(Match::new(Kind::SocialSecurity, i..j, 85));
         }
@@ -302,12 +348,16 @@ mod tests {
         assert!(run(scan_birth_date, "Fatura tarihi 05.03.1990 ve 11.11.2011").is_empty());
         assert!(run(scan_birth_date, "doğum 31.02.1990, doğum 32.01.1990").is_empty());
         assert_eq!(run(scan_birth_date, "doğum: 29.02.2000"), ["29.02.2000"]);
+        assert_eq!(run(scan_birth_date, "Hasta 12.03.1990 doğumlu"), ["12.03.1990"]);
+        assert!(run(scan_birth_date, "Doğum iznim 1 Mayıs 2999 tarihinde bitiyor").is_empty());
     }
 
     #[test]
     fn passport() {
         assert_eq!(run(scan_passport, "Pasaport No: U12345678"), ["U12345678"]);
         assert!(run(scan_passport, "Sipariş kodu U12345678").is_empty());
+        assert_eq!(run(scan_passport, "pasaport hj2212636, Pasaportumla (KF2129874)"), ["hj2212636", "KF2129874"]);
+        assert!(run(scan_passport, "pasaport Ab1234567").is_empty());
     }
 
     #[test]
@@ -315,5 +365,8 @@ mod tests {
         assert_eq!(run(scan_social_security, "SGK sicil no: 3401234567"), ["3401234567"]);
         assert_eq!(run(scan_social_security, "Bağ-Kur No 1234567, SSK 99887766"), ["1234567", "99887766"]);
         assert!(run(scan_social_security, "Sipariş 3401234567, sicil 12345").is_empty());
+        assert_eq!(run(scan_social_security, "gelir belgemi ve 84883037 numaralı SGK sicil dökümü"), ["84883037"]);
+        assert_eq!(run(scan_social_security, "kayıtlı 85387200 sicil numaralı sigortalı"), ["85387200"]);
+        assert!(run(scan_social_security, "Sipariş 3401234567 kargoya verildi").is_empty());
     }
 }

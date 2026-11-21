@@ -15,7 +15,8 @@ const MAX_DIGITS: usize = 19;
 
 #[inline]
 fn is_sep(b: u8) -> bool {
-    matches!(b, b' ' | b'-' | b'.' | b'/' | b'(' | b')')
+    // Satır sonu da ayraçtır: "0543 974\n83 76" gibi satıra bölünmüş numaralar.
+    matches!(b, b' ' | b'-' | b'.' | b'/' | b'(' | b')' | b'\n' | b'\r')
 }
 
 pub(crate) fn scan(text: &str, kinds: KindSet, claimed: &[core::ops::Range<usize>], out: &mut Vec<Match>) {

@@ -5,6 +5,45 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 
 ## [Unreleased]
 
+### Eklendi
+
+- Ad tespiti: `usta` unvanı; `teyze`, `abla`, `abi`, `amca` gibi yakınlık
+  hitapları ("Funda teyze"; cümle başındaki "Komşu teyze" eşleşmez); iki
+  noktasız zayıf etiketler ("Hesap sahibi Tülay Ünal", "sürücü Kadri
+  Zeybekoğlu", en az iki kelimeyle); yeni zayıf etiketler: `davacı`, `davalı`,
+  `gönderici`, `müvekkil`, `sigortalı`, `sürücü`.
+- Küçük harfli metinde (transkript, mesajlaşma) bağlamla ad tespiti, sözlük
+  gerektirmez: önde `adım`, `soyadım`, `ismim`, `av.`, `sayın`, `müvekkil`
+  ("adım mizgîn özbek"); arkada `hanım`, `bey`, `isimli`, `adlı`, `adında`
+  ("meltem tuna hanım"). En fazla iki kelime alınır; yaygın kelimeler ve
+  çekimli fiiller ("adım yerine", "soyadım değişmiş") elenir.
+- Plaka: tireli (`26-KL-469`), bitişik küçük harfli (`63rua42`) ve plaka
+  bağlamında boşluklu küçük harfli (`46 fp 540`) yazımlar.
+- Pasaport: iki harfli önek (`KF2129874`) ve küçük harf (`hj2212636`).
+- SGK sicil no: numaradan sonra gelen bağlam ("84883037 numaralı SGK sicil").
+- Doğum tarihi: tarihten sonra gelen bağlam ("12.03.1990 doğumlu"); öndeki
+  bağlam penceresi 40'tan 60 bayta çıktı.
+- Satıra bölünmüş IBAN ve rakam dizileri ("0543 974⏎83 76").
+- Gayriresmî (tarifli) adresler: "Bostanlı'da, iskelenin arkasındaki sokakta,
+  3. kat", "okulun arka tarafındaki müstakil evde, Kemeraltı tarafında". Sabit
+  ifade listesi yerine yapıya bakılır: `-ki` almış konum sözcüğü + konut
+  sözcüğü; soldaki semt (`X'da,`) ve sağdaki kat/kapı/`X tarafında` parçaları
+  eklenir. Semt, ek parça ya da konut bağlamı yoksa varsayılan eşikte
+  maskelenmez ("parkın karşısındaki binada toplantı").
+- Yazıyla söylenmiş telefon ve TC kimlik numaraları ("sıfır beş yüz otuz beş
+  iki yüz seksen üç on yedi yetmiş altı"); çağrı merkezi transkriptleri ve
+  sesli asistan çıktıları için. Türkçe ve ASCII yazım desteklenir. Belirsiz
+  gruplamalarda ("doksan beş yüz yetmiş") tüm okumalar denenir; TCKN sağlaması
+  tutan okuma seçilir. En az 10 hane gerekir, sıradan metindeki sayılar
+  eşleşmez.
+
+### Düzeltildi
+
+- "Sayın İlgili", "Sayın Müşterimiz", "Sayın Hâkimliğe", "Değerli Hocam",
+  "Müşteri Hizmetleri" gibi hitap ve kurum kelimeleri artık ad sanılmıyor.
+- Gelecekteki tarihler doğum tarihi olarak işaretlenmiyor ("teslimat
+  19.03.2027"). wasm hedefinde saat olmadığı için bu denetim yapılmaz.
+
 ## [0.3.1] - 2026-11-18
 
 ### Eklendi

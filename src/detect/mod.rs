@@ -2,9 +2,11 @@
 
 mod address;
 mod extra;
+mod informal;
 mod names;
 mod numeric;
 mod pattern;
+mod spoken;
 mod terms;
 
 pub use terms::Terms;
@@ -37,6 +39,7 @@ pub(crate) fn detect(text: &str, kinds: KindSet, min_confidence: u8, terms: Opti
     }
     if kinds.contains(Kind::Address) {
         address::scan_address(text, &mut out);
+        informal::scan_informal(text, &mut out);
     }
     if let Some(t) = terms.filter(|_| kinds.contains(Kind::Custom)) {
         t.scan(text, &mut out);
@@ -48,6 +51,10 @@ pub(crate) fn detect(text: &str, kinds: KindSet, min_confidence: u8, terms: Opti
     let numeric_kinds = [Kind::Tckn, Kind::Vkn, Kind::Phone, Kind::Card];
     if numeric_kinds.iter().any(|&k| kinds.contains(k)) {
         numeric::scan(text, kinds, &claimed, &mut out);
+    }
+    // Yazıyla söylenmiş telefon ve TCKN ("sıfır beş yüz otuz beş ...").
+    if kinds.contains(Kind::Tckn) || kinds.contains(Kind::Phone) {
+        spoken::scan(text, kinds, &claimed, &mut out);
     }
     // SGK sicil no rakam aşamasından sonra: "SGK no: <geçerli TCKN>" TCKN olarak kalır.
     if kinds.contains(Kind::SocialSecurity) {

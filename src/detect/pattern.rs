@@ -3,7 +3,12 @@
 
 use crate::checksum::is_valid_tr_iban;
 use crate::entity::{Kind, Match};
-use crate::text::{boundary_after, boundary_before};
+use crate::text::{boundary_after, boundary_before, context_has};
+
+/// Küçük harfli ve boşluklu plaka ("46 fp 540") yalnızca bu bağlamla kabul edilir.
+const PLATE_WORDS: &[&str] = &["plaka", "arac", "araç", "araba", "otomobil", "taşıt", "tasit"];
+/// Küçük harfli yazımda plaka harfi sanılabilecek yaygın kısa kelimeler.
+const PLATE_LOWER_STOP: &[&[u8]] = &[b"ve", b"ile", b"ya", b"da", b"de", b"ki", b"mi", b"mu", b"bu", b"en", b"az", b"ay", b"her", b"son", b"ilk", b"no"];
 
 /// `TR33 0006 1005 1978 6457 8413 26` veya bitişik yazılmış TR IBAN'ları.
 pub(crate) fn scan_iban(text: &str, out: &mut Vec<Match>) {
@@ -28,7 +33,7 @@ pub(crate) fn scan_iban(text: &str, out: &mut Vec<Match>) {
                     count += 1;
                     last_was_sep = false;
                 }
-                b' ' | b'-' if !last_was_sep && count > 0 => last_was_sep = true,
+                b' ' | b'-' | b'\n' if !last_was_sep && count > 0 => last_was_sep = true,
                 _ => break,
             }
             j += 1;
@@ -107,9 +112,13 @@ pub(crate) fn scan_plate(text: &str, out: &mut Vec<Match>) {
             continue;
         }
         let code = (b[i] - b'0') as u32 * 10 + (b[i + 1] - b'0') as u32;
-        if let Some((end, conf)) = plate_tail(b, i + 2).filter(|_| (1..=81).contains(&code)) {
-            if boundary_after(text, end) {
-                out.push(Match::new(Kind::Plate, i..end, conf));
+        if let Some(t) = plate_tail(b, i + 2).filter(|_| (1..=81).contains(&code)) {
+            // Küçük harf: bitişik yazım ("63rua42") ya da plaka bağlamı şart.
+            let lower_ok = !t.lower || (!t.spaced && t.conf > 60) || context_has(text, i, 40, PLATE_WORDS);
+            if boundary_after(text, t.end) && lower_ok {
+                let conf = if t.lower && t.spaced { t.conf.min(80) } else { t.conf };
+                out.push(Match::new(Kind::Plate, i..t.end, conf));
+                let end = t.end;
                 i = end;
                 continue;
             }
@@ -118,20 +127,37 @@ pub(crate) fn scan_plate(text: &str, out: &mut Vec<Match>) {
     }
 }
 
-/// Plakanın harf+rakam kuyruğu: (bitiş, güven puanı).
-fn plate_tail(b: &[u8], mut j: usize) -> Option<(usize, u8)> {
+struct PlateTail {
+    end: usize,
+    conf: u8,
+    /// Harfler küçük mü ("34 abc 123").
+    lower: bool,
+    /// Ayraç (boşluk ya da tire) içeriyor mu.
+    spaced: bool,
+}
+
+/// Plakanın harf+rakam kuyruğu. Ayraç boşluk ya da tire olabilir ("26-KL-469");
+/// harfler ya hepsi büyük ya hepsi küçük olmalı.
+fn plate_tail(b: &[u8], mut j: usize) -> Option<PlateTail> {
     let n = b.len();
-    if j < n && b[j] == b' ' {
+    let mut sep: Option<u8> = None;
+    if j < n && matches!(b[j], b' ' | b'-') {
+        sep = Some(b[j]);
         j += 1;
     }
     let ls = j;
-    while j < n && b[j].is_ascii_uppercase() && j - ls < 4 {
-        if matches!(b[j], b'Q' | b'W' | b'X') {
+    let lower = j < n && b[j].is_ascii_lowercase();
+    let same_case = |c: u8| if lower { c.is_ascii_lowercase() } else { c.is_ascii_uppercase() };
+    while j < n && same_case(b[j]) && j - ls < 4 {
+        if matches!(b[j].to_ascii_uppercase(), b'Q' | b'W' | b'X') {
             return None;
         }
         j += 1;
     }
     let letters = j - ls;
+    if lower && PLATE_LOWER_STOP.contains(&&b[ls..j]) {
+        return None;
+    }
     // "12 TL 500", "5 KG 250" gibi birim kısaltmaları da plaka biçimine uyar.
     // Gerçek plakalarda da geçebildikleri için reddetmek yerine güveni düşürürüz
     // (varsayılan eşik 70'in altı; `min_confidence(60)` ile dahil edilebilir).
@@ -139,8 +165,11 @@ fn plate_tail(b: &[u8], mut j: usize) -> Option<(usize, u8)> {
         b"TL", b"KG", b"KM", b"CM", b"MM", b"MB", b"GB", b"KB", b"TB", b"MG", b"ML", b"HP", b"KW", b"DK",
         b"SN", b"LT", b"ADT", b"KWH",
     ];
-    let conf = if UNITS.contains(&&b[ls..j]) { 60 } else { 90 };
-    if j < n && b[j] == b' ' {
+    let upper: Vec<u8> = b[ls..j].to_ascii_uppercase();
+    let conf = if UNITS.contains(&upper.as_slice()) { 60 } else { 90 };
+    // İkinci ayraç ilkiyle aynı olmalı ("34 ABC-123" kabul edilmez).
+    if j < n && matches!(b[j], b' ' | b'-') && sep.is_none_or(|s| s == b[j]) {
+        sep = Some(b[j]);
         j += 1;
     }
     let ds = j;
@@ -154,7 +183,7 @@ fn plate_tail(b: &[u8], mut j: usize) -> Option<(usize, u8)> {
         3 => (2..=3).contains(&nd),
         _ => false,
     };
-    ok.then_some((j, conf))
+    ok.then_some(PlateTail { end: j, conf, lower, spaced: sep.is_some() })
 }
 
 #[cfg(test)]
@@ -194,5 +223,22 @@ mod tests {
         );
         assert!(kinds(scan_plate, "99 ABC 123 ve 34 km 120 ve 34 QW 123").is_empty());
         assert_eq!(kinds(scan_plate, "51 EUR 557"), ["51 EUR 557"]);
+    }
+
+    #[test]
+    fn plate_variants() {
+        assert_eq!(kinds(scan_plate, "Plakalar 26-KL-469 ve 63rua42."), ["26-KL-469", "63rua42"]);
+        assert_eq!(kinds(scan_plate, "aracın plakası 46 fp 540 idi"), ["46 fp 540"]);
+        // bağlamsız küçük harf, karışık ayraç ve yaygın kelimeler plaka değildir
+        assert!(kinds(scan_plate, "toplam 46 fp 540 adet, 34 ABC-123").is_empty());
+        assert!(kinds(scan_plate, "araç sayısı 10 ve 200 arası").is_empty());
+    }
+
+    #[test]
+    fn iban_line_break() {
+        assert_eq!(
+            kinds(scan_iban, "IBAN: TR33 0006 1005\n1978 6457 8413 26 adresine"),
+            ["TR33 0006 1005\n1978 6457 8413 26"]
+        );
     }
 }

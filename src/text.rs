@@ -126,6 +126,26 @@ pub fn context_has(s: &str, i: usize, window: usize, keywords: &[&str]) -> bool 
     })
 }
 
+/// `context_has`'ın sağ tarafa bakan karşılığı: `i`'den sonraki `window` bayt içinde
+/// anahtar kelimelerden biri başlıyor mu ("84883037 numaralı SGK sicil").
+pub fn context_after_has(s: &str, i: usize, window: usize, keywords: &[&str]) -> bool {
+    debug_assert!(keywords.iter().all(|k| k.as_bytes().first().is_some_and(u8::is_ascii_lowercase)));
+    let mut end = (i + window).min(s.len());
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    // Başka bir değere ait bağlamı almamak için ilk noktalamada dur ("123, sicil 45").
+    let ctx = &s[i..end];
+    let cut = ctx.bytes().position(|c| matches!(c, b',' | b';' | b':' | b'\n' | b'.')).unwrap_or(ctx.len());
+    let ctx = &ctx[..cut];
+    ctx.bytes().enumerate().any(|(p, c)| {
+        let lc = c.to_ascii_lowercase();
+        c.is_ascii_alphabetic()
+            && (p == 0 || !ctx.as_bytes()[p - 1].is_ascii_alphabetic())
+            && keywords.iter().any(|k| k.as_bytes().first() == Some(&lc) && starts_with_tr_ci(&ctx[p..], k))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
