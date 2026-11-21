@@ -7,6 +7,19 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 
 ### Eklendi
 
+- Ad ve soyad sözlükleri (`src/detect/veri/`): 151 elle yazılmış adın yerine
+  1.699 ad ve 3.558 soyadı. Kaynak Wikidata (CC0): Türk vatandaşı kişilerin
+  verilen ad (P735) ve soyadı (P734) değerleri, en az iki kişide geçenler.
+  Yaygın kelime ya da il adı olanlar (Deniz, Ekim, Kaya, Demir, Bursa ...)
+  bilerek dışarıda.
+- Yeni ad kuralları: cümle ortasında tek başına sözlükteki ad ("Taner
+  kardeşim"; tarihteki ay adı "6 Kasım" ve yer eki alan "Fatih'te" hariç);
+  bilinmeyen ad + sözlükteki soyad ("Nasrullah Kalender"); kendini tanıtma
+  ("adım Evren Uslu", "Ben Berçem Akbulak", "ben banu"); imza ("Kolay gelsin,
+  Zübeyir"); küçük harfli sözlük zinciri ("nimet özdemir").
+- Şirket unvanı denetimi: zincirin içinde ya da ardında `Mobilya`, `İnşaat`,
+  `Ltd`, `A.Ş.` gibi bir unvan kelimesi varsa kişi adı sayılmaz ("Çiğdem
+  Mobilya", "Yılmaz İnşaat A.Ş.").
 - Ad tespiti: `usta` unvanı; `teyze`, `abla`, `abi`, `amca` gibi yakınlık
   hitapları ("Funda teyze"; cümle başındaki "Komşu teyze" eşleşmez); iki
   noktasız zayıf etiketler ("Hesap sahibi Tülay Ünal", "sürücü Kadri

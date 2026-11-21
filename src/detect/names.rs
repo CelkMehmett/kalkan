@@ -47,6 +47,27 @@ const STOP: &[&str] = &[
     "sokak", "sorumlusu", "sözleşmesi", "tc", "tckn", "tel", "telefon", "temsilcisi", "vekili", "vkn",
     "yetkilisi", "şubesi",
 ];
+/// Şirket unvanı kelimeleri: ad zinciri bunlardan birini içerir ya da hemen ardından
+/// bunlardan biri gelirse zincir kişi adı sayılmaz ("Çiğdem Mobilya", "Yılmaz İnşaat A.Ş.").
+const ORG: &[&str] = &[
+    "a", "ajans", "ajansi", "ajansı", "aracilik", "aracılık", "avm", "bilisim", "bilişim",
+    "danismanlik", "danışmanlık", "ecza", "eczanesi", "elektrik", "elektronik", "emlak", "enerji",
+    "gayrimenkul", "gida", "giyim", "grup", "gıda", "hizmetleri", "holding", "hukuk", "ihracat",
+    "insaat", "inşaat", "ithalat", "kafe", "kimya", "kirtasiye", "kozmetik", "kuafor", "kuaför",
+    "kırtasiye", "lojistik", "ltd", "makina", "makine", "market", "matbaa", "medikal", "mimarlik",
+    "mimarlık", "mobilya", "muhendislik", "mühendislik", "nakliyat", "nakliye", "optik", "otomotiv",
+    "pazarlama", "petrol", "restoran", "san", "sanayi", "sigorta", "sti", "teknoloji",
+    "teknolojileri", "tekstil", "tic", "ticaret", "turizm", "yapi", "yapı", "yatirim", "yatırım",
+    "yayincilik", "yayinlari", "yayıncılık", "yayınları", "yazilim", "yazılım", "şti",
+];
+/// Kendini tanıtma: ardından gelen büyük harfli zincir ad ("adım Evren Uslu").
+const INTRO: &[&str] = &["adim", "adım", "ben", "ismim"];
+/// İmzadan önce gelen kapanış ifadeleri (iki kelimelikler boşlukla).
+const CLOSINGS: &[&str] = &[
+    "best regards", "hürmetlerimle", "iyi çalışmalar", "iyi günler", "kolay gelsin", "regards",
+    "saygılar", "saygılarımla", "saygilarimla", "selamlar", "sevgiler", "teşekkürler",
+    "tesekkurler",
+];
 /// Küçük harfli metin (transkript, mesajlaşma) için: ardından ad gelen kelimeler.
 /// ("adı", "sahibi", "usta" küçük harfte çok belirsiz: "adı yok", "ev sahibi evi", "usta yarın".)
 const LOWER_BEFORE: &[&str] = &[
@@ -80,25 +101,15 @@ const NOT_NAME_PREFIX: &[&str] = &[
     "sevgili", "valili", "yetkili", "üye",
 ];
 
-/// Yaygın Türkçe adlar (sıralı). "Deniz, Umut, Barış, Can, Gül" gibi aynı zamanda
-/// sıradan kelime olanlar bilerek dışarıda; onlar yalnızca unvan/hitapla yakalanır.
-const FIRST_NAMES: &[&str] = &[
-    "abdullah", "abdurrahman", "adem", "ahmet", "ali", "alper", "arda", "aslı", "asya", "ayla", "aylin",
-    "ayten", "ayşe", "azra", "batuhan", "bekir", "berk", "berna", "beyza", "burak", "burcu", "buse",
-    "bülent", "büşra", "canan", "cansu", "cem", "cemal", "cengiz", "ceren", "cihan", "defne", "derya",
-    "dilara", "doruk", "ebru", "ecrin", "efe", "elif", "emine", "emir", "emre", "enes", "engin",
-    "ercan", "erdem", "eren", "erkan", "esra", "fadime", "fatih", "fatma", "filiz", "furkan", "gamze",
-    "gökhan", "gözde", "gülay", "gülsüm", "hakan", "halil", "hamza", "hanife", "harun", "hasan",
-    "hatice", "havva", "hülya", "hüseyin", "ibrahim", "ilhan", "ilker", "ilknur", "irem", "ismail",
-    "kaan", "kadir", "kemal", "kenan", "kerem", "kübra", "levent", "leyla", "mahmut", "mehmet", "mert",
-    "merve", "meryem", "metin", "murat", "musa", "mustafa", "mücahit", "nazlı", "nermin", "nesrin",
-    "nilay", "nisa", "nuray", "nurcan", "okan", "oktay", "onur", "orhan", "osman", "oğuz", "pınar",
-    "rabia", "ramazan", "recep", "saadet", "salih", "seda", "sedat", "selim", "selin", "sena", "serdar",
-    "serkan", "serpil", "sevda", "sevim", "sibel", "sinan", "songül", "sultan", "süleyman", "taner",
-    "tarık", "tayfun", "tolga", "tuba", "tuncay", "tuncer", "tuğba", "tülin", "uğur", "volkan",
-    "yasemin", "yaşar", "yeliz", "yeşim", "yiğit", "yunus", "yusuf", "zafer", "zehra", "zeliha",
-    "zerrin", "zeynep", "ömer", "özlem", "şerife", "şeyma", "şule",
-];
+/// Ad ve soyad sözlükleri (`veri/`): satır başına bir kelime, `#` ile başlayan satırlar
+/// açıklama. "Deniz, Umut, Barış, Can, Gül" gibi aynı zamanda sıradan kelime olanlar
+/// bilerek dışarıda; onlar yalnızca unvan/hitapla yakalanır.
+const FIRST_NAMES: &str = include_str!("veri/adlar.txt");
+const SURNAMES: &str = include_str!("veri/soyadlar.txt");
+
+fn lines(s: &'static str) -> impl Iterator<Item = &'static str> {
+    s.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#'))
+}
 
 /// Listelerdeki en uzun kelimeden uzun kelimelerin küçük harfi tutulmaz.
 const MAX_LOWER: usize = 16;
@@ -115,13 +126,15 @@ struct Word {
 }
 
 // Sözlük bayrakları: bir kelime birden çok listede olabilir.
-const F_TITLE: u8 = 1;
-const F_SUFFIX: u8 = 2;
-const F_STRONG: u8 = 4;
-const F_WEAK: u8 = 8;
-const F_STOP: u8 = 16;
-const F_FIRST: u8 = 32;
-const F_KIN: u8 = 64;
+const F_TITLE: u16 = 1;
+const F_SUFFIX: u16 = 2;
+const F_STRONG: u16 = 4;
+const F_WEAK: u16 = 8;
+const F_STOP: u16 = 16;
+const F_FIRST: u16 = 32;
+const F_KIN: u16 = 64;
+const F_SUR: u16 = 128;
+const F_ORG: u16 = 256;
 
 /// Kısa anahtarlar için hızlı FNV-1a (SipHash'e göre birkaç kat hızlı).
 #[derive(Default)]
@@ -141,7 +154,7 @@ impl core::hash::Hasher for Fnv {
     }
 }
 
-type Lexicon = HashMap<&'static str, u8, BuildHasherDefault<Fnv>>;
+type Lexicon = HashMap<&'static str, u16, BuildHasherDefault<Fnv>>;
 
 /// Tüm listeleri tek bir tabloda birleştirir: kelime başına tek arama.
 fn lexicon() -> &'static Lexicon {
@@ -154,10 +167,15 @@ fn lexicon() -> &'static Lexicon {
             (STRONG_LABELS, F_STRONG),
             (WEAK_LABELS, F_WEAK),
             (STOP, F_STOP),
-            (FIRST_NAMES, F_FIRST),
             (KIN, F_KIN),
+            (ORG, F_ORG),
         ] {
             for &w in set {
+                *m.entry(w).or_insert(0) |= flag;
+            }
+        }
+        for (set, flag) in [(FIRST_NAMES, F_FIRST), (SURNAMES, F_SUR)] {
+            for w in lines(set) {
                 *m.entry(w).or_insert(0) |= flag;
             }
         }
@@ -231,11 +249,11 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
         return;
     }
     let lex = lexicon();
-    let flags: Vec<u8> = words
+    let flags: Vec<u16> = words
         .iter()
         .map(|w| if w.le > w.ls { lex.get(&arena[w.ls..w.le]).copied().unwrap_or(0) } else { 0 })
         .collect();
-    let has = |k: usize, f: u8| flags[k] & f != 0;
+    let has = |k: usize, f: u16| flags[k] & f != 0;
     let gap = |a: usize, b: usize| &text[words[a].e..words[b].s];
     let space_gap = |a: usize, b: usize| {
         let g = gap(a, b);
@@ -274,10 +292,28 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
         while end + 1 < n && end + 1 - k < MAX_CHAIN && space_gap(end, end + 1) && nameable(end + 1) {
             end += 1;
         }
+        // Şirket unvanı: "Çiğdem Mobilya", "Yılmaz İnşaat A.Ş.", "Polat Gıda San. ve Tic."
+        let org_next = end + 1 < n && space_gap(end, end + 1) && words[end + 1].cap && has(end + 1, F_ORG);
+        if org_next || (k..=end).any(|j| has(j, F_ORG)) {
+            return None;
+        }
         Some((k, end))
     };
     let push = |out: &mut Vec<Match>, a: usize, b: usize, conf: u8| {
         out.push(Match::new(Kind::Name, words[a].s..words[b].e, conf));
+    };
+
+    // "6 Kasım": önce sayı geliyorsa ay adıdır.
+    let date_before = |k: usize| {
+        let before = text[..words[k].s].trim_end_matches([' ', '.']);
+        before.ends_with(|c: char| c.is_ascii_digit())
+    };
+    // "Fatih'te", "Ceyhan'dan": kesmeden sonra bulunma/ayrılma eki yer adını gösterir.
+    let place_suffix = |k: usize| {
+        let rest = &text[words[k].e..];
+        let Some(ek) = rest.strip_prefix(['\'', '’']) else { return false };
+        let ek: String = ek.chars().take_while(|c| c.is_alphabetic()).collect::<String>().to_lowercase();
+        ["da", "de", "ta", "te", "dan", "den", "tan", "ten"].contains(&ek.as_str())
     };
 
     // Küçük harfli bağlam kuralı için aday kelime.
@@ -285,7 +321,7 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
     let lower_name = |k: usize| {
         !words[k].cap
             && words[k].le > words[k].ls
-            && flags[k] == 0
+            && flags[k] & !(F_FIRST | F_SUR) == 0
             && !LOWER_COMMON.contains(&lw(k))
             && !(lw(k).chars().count() > 4 && VERB_ENDINGS.iter().any(|e| lw(k).ends_with(e)))
             && !LOWER_BEFORE.contains(&lw(k))
@@ -295,8 +331,78 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
             && !in_claimed(k)
     };
 
+    // Sözlükteki adla başlayan küçük harfli zincir: "izzet yekta demiroğlu", "ben banu".
+    let lower_dict_chain = |k: usize| -> Option<usize> {
+        if !(has(k, F_FIRST) && lower_name(k)) {
+            return None;
+        }
+        let mut b = k;
+        while b + 1 < n && b - k < 2 && space_gap(b, b + 1) && lower_name(b + 1) && has(b + 1, F_FIRST | F_SUR) {
+            b += 1;
+        }
+        Some(b)
+    };
+    // İmza satırı: "Saygılarımla, Ayşegül Hakimi", "Kolay gelsin,\nZübeyir".
+    let after_closing = |k: usize| {
+        if k == 0 || !gap(k - 1, k).contains([',', '\n']) || gap(k - 1, k).len() > 4 {
+            return false;
+        }
+        let last = lw(k - 1);
+        let prev = if k >= 2 { lw(k - 2) } else { "" };
+        CLOSINGS.iter().any(|c| match c.split_once(' ') {
+            Some((a, b)) => prev == a && last == b,
+            None => last == *c,
+        })
+    };
+    let line_ends_after = |b: usize| {
+        let rest = text[words[b].e..].trim_start_matches([' ', '.', ',']);
+        rest.is_empty() || rest.starts_with(['\n', '\r'])
+    };
+
     let mut k = 0;
     while k < n {
+        // 6) Tanıtma: "adım Evren Uslu", "Ben Berçem Akbulak", "hoş geldiniz ben banu".
+        if INTRO.contains(&lw(k)) && k + 1 < n && space_gap(k, k + 1) {
+            if words[k + 1].cap {
+                if let Some((a, b)) = chain(k + 1) {
+                    if b > a || has(a, F_FIRST) || (lw(k) != "ben" && line_ends_after(a)) {
+                        push(out, a, b, 80);
+                        k = b + 1;
+                        continue;
+                    }
+                }
+            } else if lw(k) == "ben" {
+                if let Some(b) = lower_dict_chain(k + 1) {
+                    push(out, k + 1, b, 72);
+                    k = b + 1;
+                    continue;
+                }
+            }
+        }
+        // 7) İmza: kapanış ifadesinden sonra gelen ad.
+        if words[k].cap && after_closing(k) {
+            if let Some((a, b)) = chain(k) {
+                // "Selamlar, Kargomu Bursa aktarmadan" selamlamadır: satır sonu, sözlükteki ad
+                // ya da ardından gelen alan etiketi ("… Hakimi Tel:") gerekir.
+                let field_next = b + 1 < n && space_gap(b, b + 1) && has(b + 1, F_STOP);
+                if has(a, F_FIRST | F_SUR) || has(b, F_SUR) || line_ends_after(b) || field_next {
+                    push(out, a, b, 75);
+                    k = b + 1;
+                    continue;
+                }
+            }
+        }
+        // 8) Küçük harfli iki+ sözlük kelimesi: "nimet özdemir", "izzet yekta".
+        if !words[k].cap {
+            if let Some(b) = lower_dict_chain(k) {
+                if b > k {
+                    push(out, k, b, 72);
+                    k = b + 1;
+                    continue;
+                }
+            }
+        }
+
         // 5) Küçük harf: "adım mizgîn özbek", "av. aysun", "meltem tuna hanım".
         if !words[k].cap && LOWER_BEFORE.contains(&lw(k)) && k + 1 < n && title_gap(gap(k, k + 1)) && lower_name(k + 1) {
             let mut b = k + 1;
@@ -367,6 +473,26 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
                     k = b + 1;
                     continue;
                 }
+                // Tek ad, cümle ortasında: "Taner kardeşim", "alıcısı: Ilgın".
+                // Ardından hitap geliyorsa ("Ahmet Bey") kural 4'e bırakılır.
+                let hitap_next = k + 1 < n && has(k + 1, F_SUFFIX | F_KIN);
+                if !sentence_start(k) && !hitap_next && !date_before(k) && !place_suffix(k) {
+                    push(out, a, a, 72);
+                    k += 1;
+                    continue;
+                }
+            }
+        }
+
+        // 3b) Bilinmeyen ad + sözlükteki soyad. "Nasrullah Kalender", "Berçem Akbulak"
+        if words[k].cap && !has(k, F_FIRST) {
+            if let Some((a, b)) = chain(k) {
+                // "Bugün Kemal Sunal": ikinci kelime sözlükte bir adsa zinciri kural 3'e bırak.
+                if b > a && !has(a + 1, F_FIRST) && (a + 1..=b).any(|j| has(j, F_SUR)) {
+                    push(out, a, b, 72);
+                    k = b + 1;
+                    continue;
+                }
             }
         }
 
@@ -404,10 +530,17 @@ mod tests {
 
     #[test]
     fn lists_are_lowercase_and_short() {
-        for set in [TITLES, SUFFIXES, KIN, STRONG_LABELS, WEAK_LABELS, STOP, NOT_NAME_PREFIX, FIRST_NAMES] {
+        for set in [TITLES, SUFFIXES, KIN, STRONG_LABELS, WEAK_LABELS, STOP, NOT_NAME_PREFIX] {
             for w in set {
                 assert_eq!(crate::text::tr_lower(w), *w);
                 assert!(w.len() <= MAX_LOWER, "{w}");
+            }
+        }
+        for set in [FIRST_NAMES, SURNAMES] {
+            for w in lines(set) {
+                assert_eq!(crate::text::tr_lower(w), w);
+                assert!(w.len() <= MAX_LOWER, "{w}");
+                assert!(w.chars().all(char::is_alphabetic), "{w}");
             }
         }
     }
@@ -423,7 +556,28 @@ mod tests {
     fn labels_and_dictionary() {
         assert_eq!(names("Adı Soyadı: AHMET YILMAZ TC: 1"), ["AHMET YILMAZ"]);
         assert_eq!(names("Paketi Mehmet Ali Yılmaz'a teslim et."), ["Mehmet Ali Yılmaz"]);
-        assert_eq!(names("İSTANBUL'da Ahmet ile buluştuk."), Vec::<&str>::new());
+        // Cümle ortasında sözlükteki tek ad kişidir.
+        assert_eq!(names("İSTANBUL'da Ahmet ile buluştuk."), ["Ahmet"]);
+        // Cümle başında, tarihte (ay adı) ya da yer ekiyle tek ad maskelenmez.
+        assert!(names("Ahmet geldi mi?").is_empty());
+        assert!(names("Toplantı 6 Kasım tarihinde.").is_empty());
+        assert!(names("Yol çalışması Fatih'te de var.").is_empty());
+        assert!(names("Ceyhan'dan geçen kargo.").is_empty());
+        assert_eq!(names("Bunu Kaan'a ilet."), ["Kaan"]);
+        // Tanıtma, imza ve küçük harfli sözlük zinciri.
+        assert_eq!(names("Merhaba, adım Evren Uslu. Siparişim"), ["Evren Uslu"]);
+        assert_eq!(names("Ben Berçem Akbulak, geçen hafta"), ["Berçem Akbulak"]);
+        assert!(names("Ben Ankara'dan yazıyorum").is_empty());
+        assert_eq!(names("hoş geldiniz ben banu müşteri"), ["banu"]);
+        assert_eq!(names("Bilgilerinize.\nKolay gelsin, Zübeyir"), ["Zübeyir"]);
+        assert!(names("Selamlar, Kargomu Bursa aktarmadan bekliyor").is_empty());
+        assert_eq!(names("abi naber izzet yekta bizim kat"), ["izzet yekta"]);
+        // Sözlükte olmayan ad + sözlükteki soyad.
+        assert_eq!(names("Yeni işe alınan Nasrullah Kalender için"), ["Nasrullah Kalender"]);
+        assert_eq!(names("Bugün Kemal Sunal filmi var"), ["Kemal Sunal"]);
+        // Şirket unvanı kişi adı değildir.
+        assert!(names("Kiralama şirketi Çiğdem Mobilya istiyor.").is_empty());
+        assert!(names("Şirketimiz Yılmaz İnşaat A.Ş. adına").is_empty());
     }
 
     #[test]
@@ -441,7 +595,7 @@ mod tests {
 
     #[test]
     fn kinship_and_unlabeled_weak_labels() {
-        assert_eq!(names("anahtarı Funda teyzeye bıraktım"), Vec::<&str>::new()); // ek almış hitap eşleşmez
+        assert_eq!(names("anahtarı Funda teyzeye bıraktım"), ["Funda"]); // sözlükteki ad
         assert_eq!(names("anahtarı Funda teyze aldı"), ["Funda"]);
         assert!(names("Komşu teyze aradı.").is_empty());
         assert_eq!(names("Hesap sahibi Tülay Ünal. Teşekkürler"), ["Tülay Ünal"]);
