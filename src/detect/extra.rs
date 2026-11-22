@@ -17,7 +17,7 @@ const SGK_PHONE_WORDS: &[&str] = &["tel", "cep", "gsm", "whatsapp", "faks", "fax
 /// Numaradan sonra gelen SGK bağlamı: "84883037 numaralı SGK sicil", "85387200 sicil numaralı".
 const SGK_AFTER_WORDS: &[&str] = &["sgk", "ssk", "bağ-kur", "bagkur", "bağkur", "sicil"];
 /// Tarihten sonra gelen doğum bağlamı: "12.03.1990 doğumlu".
-const BIRTH_AFTER_WORDS: &[&str] = &["doğumlu", "dogumlu", "doğum", "dogum"];
+const BIRTH_AFTER_WORDS: &[&str] = &["doğumlu", "dogumlu", "doğum", "dogum", "doğdu", "dogdu"];
 const MONTHS: &[&str] = &[
     "ocak", "şubat", "mart", "nisan", "mayıs", "haziran", "temmuz", "ağustos", "eylül", "ekim", "kasım", "aralık",
 ];
@@ -40,7 +40,9 @@ pub(crate) fn scan_ipv4(text: &str, out: &mut Vec<Match>) {
         }
         match parse_ipv4(b, i) {
             Some(end) if boundary_after(text, end) && !(end + 1 < n && b[end] == b'.' && b[end + 1].is_ascii_digit()) => {
-                let conf = if context_has(text, i, 24, VERSION_WORDS) { 50 } else { 85 };
+                // "sürüm 3.6.0.84" ya da "3.6.0.84 sürümünden": sürüm numarası.
+                let version = context_has(text, i, 24, VERSION_WORDS) || context_after_has(text, end, 12, VERSION_WORDS);
+                let conf = if version { 50 } else { 85 };
                 out.push(Match::new(Kind::Ip, i..end, conf));
                 i = end;
             }
@@ -149,7 +151,8 @@ pub(crate) fn scan_birth_date(text: &str, out: &mut Vec<Match>) {
             // tarihim 02.11.2026" ikinci tarihi kapsamaz) ve tarih başka bir olayın
             // tarihi olmamalı ("07.07.2026 tarihinde işe başladım").
             let left = birth_label_before(text, i, 60).is_some() && !followed_by_tarih(text, end);
-            let ctx = left || context_after_has(text, end, 16, BIRTH_AFTER_WORDS);
+            // Sağda: "1990 doğumlu", "20.02.2021 tarihinde doğdu".
+            let ctx = left || context_after_has(text, end, 20, BIRTH_AFTER_WORDS);
             if boundary_after(text, end) && ctx && !in_future(b, i, end) {
                 out.push(Match::new(Kind::BirthDate, i..end, 90));
                 i = end;

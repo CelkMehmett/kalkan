@@ -498,3 +498,19 @@ fn troy_cards() {
     // 9792 dışındaki 9'lu diziler kart sayılmaz.
     assert!(!kinds_of("Kod: 9793 0000 0000 0002").contains(&Kind::Card));
 }
+
+#[test]
+fn grouped_tckn_role_email_version_ip_birth_after() {
+    // Gruplu TCKN (3-3-3-2); 0 ile başlayan gruplu 11 hane telefon olarak kalır.
+    assert_eq!(found("TCKN: 957 883 959 36"), [(Kind::Tckn, "957 883 959 36".into())]);
+    // Rol hesabı varsayılan eşikte maskelenmez, kişisel adres maskelenir.
+    assert!(found("Cevap satis@firma.example.com adresinden geldi").is_empty());
+    assert!(found("Kime: musteri.hizmetleri@magaza.example.com").is_empty());
+    assert_eq!(found("Bana ayse.kaya@firma.example.com adresinden yazın"), [(Kind::Email, "ayse.kaya@firma.example.com".into())]);
+    // Sağında "sürüm" geçen noktalı dörtlü sürüm numarasıdır.
+    assert!(!kinds_of("3.6.0.84 sürümünden sonra uygulama çöküyor").contains(&Kind::Ip));
+    assert!(kinds_of("Sunucu 146.100.72.225 adresinde").contains(&Kind::Ip));
+    // "… tarihinde doğdu"
+    assert!(kinds_of("Bebeğimiz 20.02.2021 tarihinde doğdu.").contains(&Kind::BirthDate));
+    assert!(!kinds_of("Paket 20.02.2021 tarihinde geldi.").contains(&Kind::BirthDate));
+}

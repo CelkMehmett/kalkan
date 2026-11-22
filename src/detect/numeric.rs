@@ -142,6 +142,16 @@ fn classify(
     if kinds.contains(Kind::Tckn) && single && d.len() == 11 && is_valid_tckn(d) {
         return Some((Kind::Tckn, 99));
     }
+    // Gruplu yazım: "957 883 959 36". Telefon 0 ile başlar, TCKN başlayamaz; gruplar 2-4 hane.
+    if kinds.contains(Kind::Tckn)
+        && !single
+        && d.len() == 11
+        && d[0] != b'0'
+        && groups.iter().all(|&(a, b)| (2..=4).contains(&(b - a)))
+        && is_valid_tckn(d)
+    {
+        return Some((Kind::Tckn, 90));
+    }
     if kinds.contains(Kind::Vkn)
         && single
         && d.len() == 10

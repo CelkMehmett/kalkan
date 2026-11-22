@@ -57,6 +57,21 @@ fn is_domain(c: u8) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, b'.' | b'-')
 }
 
+/// Kişiye değil göreve ait yaygın e-posta yerel adları (büyük/küçük harf duyarsız).
+const ROLE_ACCOUNTS: &[&str] = &[
+    "admin", "basvuru", "bilgi", "contact", "destek", "fatura", "hello", "help", "hr", "ik", "info",
+    "iletisim", "insankaynaklari", "kvkk", "muhasebe", "musteri", "musterihizmetleri", "noreply",
+    "no-reply", "postmaster", "sales", "satis", "siparis", "support", "webmaster",
+];
+
+/// Yerel ad bir rol hesabı mı? "musteri.hizmetleri", "satis-ekibi" gibi ayraçlı biçimlerde
+/// ilk parça bakılır.
+fn is_role_account(local: &str) -> bool {
+    let l = local.to_ascii_lowercase();
+    let head = l.split(['.', '-', '_']).next().unwrap_or("");
+    ROLE_ACCOUNTS.contains(&l.as_str()) || ROLE_ACCOUNTS.contains(&head)
+}
+
 pub(crate) fn scan_email(text: &str, out: &mut Vec<Match>) {
     let b = text.as_bytes();
     let n = b.len();
@@ -87,7 +102,9 @@ pub(crate) fn scan_email(text: &str, out: &mut Vec<Match>) {
         if dot == 0 || tld.len() < 2 || !tld.iter().all(u8::is_ascii_alphabetic) {
             continue;
         }
-        out.push(Match::new(Kind::Email, s..e, 99));
+        // Rol hesabı ("info@", "destek@") bir kişiye ait değildir: varsayılan eşiğin altında.
+        let conf = if is_role_account(&text[s..at]) { 60 } else { 99 };
+        out.push(Match::new(Kind::Email, s..e, conf));
         from = e;
     }
 }

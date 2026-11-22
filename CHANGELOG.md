@@ -28,6 +28,17 @@ turkce-pii-bench test bölümünde maskeleme isabeti
   yedi yüz doksan iki iki bin üç yüz kırk bir ...") Luhn ve ağ önekiyle kart olarak
   bulunur. "bin"den önceki "bir" önceki grubun birler hanesidir (1xxx "bin" diye
   söylenir); okuma tektir.
+- Gruplu yazılmış TCKN ("957 883 959 36"): 0 ile başlamayan, gruplar 2-4 haneli,
+  sağlaması geçerli 11 hane.
+- Doğum tarihi sağ bağlamı: "20.02.2021 tarihinde doğdu", "2020-12-13 doğdu".
+
+### Değiştirildi (tespit)
+
+- Rol e-posta hesapları (`info@`, `destek@`, `satis@`, `musteri.hizmetleri@` ...) bir
+  kişiye ait olmadığı için güven 60 (varsayılan eşik 70'in altında): maskelenmez,
+  `min_confidence(60)` ile istenirse maskelenir.
+- Sağında "sürüm/versiyon/version" geçen noktalı dörtlü ("3.6.0.84 sürümünden") IP
+  değil sürüm numarası sayılır (güven 50), solundaki gibi.
 - Ad ve soyad sözlükleri (`src/detect/veri/`): 151 elle yazılmış adın yerine
   1.699 ad ve 3.558 soyadı. Kaynak Wikidata (CC0): Türk vatandaşı kişilerin
   verilen ad (P735) ve soyadı (P734) değerleri, en az iki kişide geçenler.
