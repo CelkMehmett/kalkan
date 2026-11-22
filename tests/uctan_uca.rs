@@ -487,3 +487,14 @@ fn address_strategies() {
 
     assert!(Kalkan::builder().kinds([Kind::Tckn]).build().detect(t).is_empty());
 }
+
+#[test]
+fn troy_cards() {
+    // TROY (9792) Türkiye'nin yerli kart ağı; Luhn'u geçerli olmalı.
+    for s in ["9792 0000 0000 0003", "9792-0000-0000-0003", "9792000000000003"] {
+        assert_eq!(found(&format!("Kart: {s}.")), [(Kind::Card, s.to_string())], "{s}");
+    }
+    assert!(!kinds_of("Kart: 9792 0000 0000 0004.").contains(&Kind::Card));
+    // 9792 dışındaki 9'lu diziler kart sayılmaz.
+    assert!(!kinds_of("Kod: 9793 0000 0000 0002").contains(&Kind::Card));
+}

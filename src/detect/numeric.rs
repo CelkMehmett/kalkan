@@ -155,7 +155,10 @@ fn classify(
             return Some((Kind::Phone, conf));
         }
     }
-    if kinds.contains(Kind::Card) && (13..=19).contains(&d.len()) && matches!(d[0], b'3'..=b'6') {
+    // Ağ önekleri: 3 (Amex/Diners/JCB), 4 (Visa), 5 (Mastercard), 6 (Discover/UnionPay),
+    // 9792 (TROY, Türkiye'nin yerli kart ağı).
+    let network = matches!(d[0], b'3'..=b'6') || d.starts_with(b"9792");
+    if kinds.contains(Kind::Card) && (13..=19).contains(&d.len()) && network {
         let shape_ok = single || (groups.len() >= 3 && groups.iter().all(|&(a, b)| (3..=6).contains(&(b - a))));
         if shape_ok && luhn_valid(d) && !d.iter().all(|&b| b == d[0]) {
             return Some((Kind::Card, 97));

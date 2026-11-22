@@ -53,7 +53,7 @@ pub(crate) fn detect(text: &str, kinds: KindSet, min_confidence: u8, terms: Opti
         numeric::scan(text, kinds, &claimed, &mut out);
     }
     // Yazıyla söylenmiş telefon ve TCKN ("sıfır beş yüz otuz beş ...").
-    if kinds.contains(Kind::Tckn) || kinds.contains(Kind::Phone) {
+    if kinds.contains(Kind::Tckn) || kinds.contains(Kind::Phone) || kinds.contains(Kind::Card) {
         spoken::scan(text, kinds, &claimed, &mut out);
     }
     // SGK sicil no rakam aşamasından sonra: "SGK no: <geçerli TCKN>" TCKN olarak kalır.

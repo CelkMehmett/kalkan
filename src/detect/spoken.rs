@@ -7,7 +7,7 @@
 //! geliyorsa o kelime yeni grubu başlatır: "beş yüz yirmi | iki yüz doksan beş".
 //! En az 10 haneli diziler TCKN (sağlamayla) ya da telefon olarak sınıflanır.
 
-use crate::checksum::is_valid_tckn;
+use crate::checksum::{is_valid_tckn, luhn_valid};
 use crate::entity::{Kind, KindSet, Match};
 use crate::text::context_has;
 
@@ -22,6 +22,8 @@ enum Tok {
     Ones(u8),
     Tens(u8),
     Hundred,
+    /// "bin": yalnızca dörtlü gruplarla okunan kart numaralarında ("dokuz bin yedi yüz doksan iki").
+    Thousand,
 }
 
 fn token(w: &str) -> Option<Tok> {
@@ -47,6 +49,7 @@ fn token(w: &str) -> Option<Tok> {
         "seksen" => Tok::Tens(8),
         "doksan" => Tok::Tens(9),
         "yüz" | "yuz" => Tok::Hundred,
+        "bin" => Tok::Thousand,
         _ => return None,
     })
 }
@@ -110,6 +113,8 @@ fn readings(toks: &[Tok]) -> Vec<Vec<u8>> {
                 acc.truncate(mark);
             }
             Tok::Tens(t) => finish(acc, outs, i + 1, &[b'0' + t]),
+            // Binli diziler `thousands_reading` ile okunur; buraya gelmez.
+            Tok::Thousand => {}
             Tok::Ones(_) | Tok::Hundred => {
                 let h = match tok {
                     Tok::Ones(h) => {
@@ -132,6 +137,56 @@ fn readings(toks: &[Tok]) -> Vec<Vec<u8>> {
     let mut outs = Vec::new();
     go(toks, 0, &mut Vec::with_capacity(toks.len() * 2), &mut outs);
     outs
+}
+
+/// Her grubu "[<birler>] bin [[<birler>] yüz] [<onlar>] [<birler>]" olan dizinin dört
+/// haneli gruplarla okunuşu: "dokuz bin yedi yüz doksan iki dört bin ..." → 9792 4...
+/// 1xxx grubu "bin" diye söylenir, "bir bin" denmez: "bin"den önceki "bir" önceki grubun
+/// birler hanesidir ("kırk bir bin dokuz yüz" → …41|1900), "iki".."dokuz" ise sonraki
+/// grubun çarpanı. Böylece okuma tektir. Bir grup biçime uymuyorsa `None`.
+fn thousands_reading(toks: &[Tok]) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(toks.len());
+    let mut i = 0;
+    while i < toks.len() {
+        let m = match (toks.get(i), toks.get(i + 1)) {
+            (Some(&Tok::Ones(o)), Some(&Tok::Thousand)) if o != 1 => {
+                i += 2;
+                o
+            }
+            (Some(&Tok::Thousand), _) => {
+                i += 1;
+                1
+            }
+            _ => return None,
+        };
+        let h = match (toks.get(i), toks.get(i + 1)) {
+            (Some(&Tok::Ones(o)), Some(&Tok::Hundred)) => {
+                i += 2;
+                o
+            }
+            (Some(&Tok::Hundred), _) => {
+                i += 1;
+                1
+            }
+            _ => 0,
+        };
+        let t = match toks.get(i) {
+            Some(&Tok::Tens(t)) => {
+                i += 1;
+                t
+            }
+            _ => 0,
+        };
+        let o = match (toks.get(i), toks.get(i + 1)) {
+            (Some(&Tok::Ones(o)), next) if o == 1 || next != Some(&Tok::Thousand) => {
+                i += 1;
+                o
+            }
+            _ => 0,
+        };
+        out.extend([b'0' + m, b'0' + h, b'0' + t, b'0' + o]);
+    }
+    Some(out)
 }
 
 fn classify(text: &str, start: usize, all: &[Vec<u8>], kinds: KindSet) -> Option<(Kind, u8)> {
@@ -172,15 +227,38 @@ fn classify(text: &str, start: usize, all: &[Vec<u8>], kinds: KindSet) -> Option
 pub(crate) fn scan(text: &str, kinds: KindSet, claimed: &[core::ops::Range<usize>], out: &mut Vec<Match>) {
     // Kelimeler: (başlangıç, bitiş, tür). Sayı kelimesi olmayanlar zinciri böler.
     let mut run: Vec<(usize, usize, Tok)> = Vec::new();
-    let flush = |run: &mut Vec<(usize, usize, Tok)>, out: &mut Vec<Match>| {
+    let free = |s: usize, e: usize| !claimed.iter().any(|r| s < r.end && e > r.start);
+    let numbers = |run: &[(usize, usize, Tok)], out: &mut Vec<Match>| {
         if run.len() >= 4 {
             let toks: Vec<Tok> = run.iter().map(|x| x.2).collect();
             let (s, e) = (run[0].0, run[run.len() - 1].1);
-            if !claimed.iter().any(|r| s < r.end && e > r.start) {
+            if free(s, e) {
                 if let Some((kind, conf)) = classify(text, s, &readings(&toks), kinds) {
                     out.push(Match::new(kind, s..e, conf));
                 }
             }
+        }
+    };
+    let flush = |run: &mut Vec<(usize, usize, Tok)>, out: &mut Vec<Match>| {
+        if run.iter().any(|x| x.2 == Tok::Thousand) {
+            // Dörtlü gruplarla okunan kart numarası; değilse "bin"de bölünür (eski davranış).
+            let toks: Vec<Tok> = run.iter().map(|x| x.2).collect();
+            let card = kinds.contains(Kind::Card)
+                && thousands_reading(&toks).is_some_and(|d| {
+                    (13..=19).contains(&d.len())
+                        && (matches!(d[0], b'3'..=b'6') || d.starts_with(b"9792"))
+                        && luhn_valid(&d)
+                });
+            let (s, e) = (run[0].0, run[run.len() - 1].1);
+            if card && free(s, e) {
+                out.push(Match::new(Kind::Card, s..e, 88));
+            } else {
+                for part in run.split(|x| x.2 == Tok::Thousand) {
+                    numbers(part, out);
+                }
+            }
+        } else {
+            numbers(run, out);
         }
         run.clear();
     };
@@ -287,6 +365,24 @@ mod tests {
         let s = "tc kimlik on milyon değil: on sıfır sıfır sıfır sıfır sıfır sıfır bir kırk altı";
         assert_eq!(run(s).len(), 1);
         assert_eq!(run(s)[0].0, Kind::Tckn);
+    }
+
+    #[test]
+    fn card_in_thousand_groups() {
+        // 4532 2234 5678 9012 (Luhn geçerli)
+        let k = "dört bin beş yüz otuz iki iki bin iki yüz otuz dört beş bin altı yüz yetmiş sekiz dokuz bin on iki";
+        assert_eq!(run(&format!("kart numaram {k} tamam")), [(Kind::Card, k.into())]);
+        // "bin"den önceki "bir" önceki gruba aittir: 9792 2341 1971 5975.
+        let k = "dokuz bin yedi yüz doksan iki iki bin üç yüz kırk bir bin dokuz yüz yetmiş bir beş bin dokuz yüz yetmiş beş";
+        assert_eq!(thousands_reading(&k.split(' ').map(|w| token(&fold(w)).unwrap()).collect::<Vec<_>>()).unwrap(), b"9792234119715975");
+        // Son hane farklı: Luhn tutmaz, kart değil.
+        let k = "dört bin beş yüz otuz iki iki bin iki yüz otuz dört beş bin altı yüz yetmiş sekiz dokuz bin on beş";
+        assert!(run(k).iter().all(|(kind, _)| *kind != Kind::Card));
+        // Sıfırla başlayan grup binli okunmaz.
+        let k = "dokuz bin yedi yüz doksan iki sıfır sıfır sıfır sıfır sıfır sıfır sıfır sıfır sıfır sıfır sıfır üç";
+        assert!(run(k).iter().all(|(kind, _)| *kind != Kind::Card));
+        // "bin" sıradan metinde diziyi eskisi gibi böler.
+        assert!(run("beş bin kişi geldi, iki bin üç yüz otuz ikisi kaldı").is_empty());
     }
 
     #[test]

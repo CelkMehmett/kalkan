@@ -22,6 +22,12 @@ turkce-pii-bench test bölümünde maskeleme isabeti
 
 ### Eklendi
 
+- TROY kartları: 9792 ile başlayan, Luhn'u geçerli 16 haneli numaralar kart sayılır
+  (Türkiye'nin yerli kart ağı; önceden yalnızca 3-6 ile başlayan ağlar tanınıyordu).
+- Yazıyla okunan kart numaraları: dört haneli gruplarla söylenen numara ("dokuz bin
+  yedi yüz doksan iki iki bin üç yüz kırk bir ...") Luhn ve ağ önekiyle kart olarak
+  bulunur. "bin"den önceki "bir" önceki grubun birler hanesidir (1xxx "bin" diye
+  söylenir); okuma tektir.
 - Ad ve soyad sözlükleri (`src/detect/veri/`): 151 elle yazılmış adın yerine
   1.699 ad ve 3.558 soyadı. Kaynak Wikidata (CC0): Türk vatandaşı kişilerin
   verilen ad (P735) ve soyadı (P734) değerleri, en az iki kişide geçenler.
