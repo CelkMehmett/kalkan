@@ -1,20 +1,6 @@
-# Contributing / Katkı rehberi
+# Katkı rehberi
 
-> **English summary.** Contributions are welcome in English or Turkish. Before opening a PR run:
->
-> ```bash
-> cargo test --workspace --exclude kalkan-py
-> cargo test --features ffi --lib
-> cargo clippy --workspace --all-targets --features ffi -- -D warnings
-> ```
->
-> plus the Python/JS tests if you touched the bindings (commands below). Rules: the core in
-> `src/` stays **dependency-free** and `#![forbid(unsafe_code)]` (`unsafe` only in `src/ffi.rs`
-> behind the `ffi` feature); new detectors go in `src/detect/` and must keep spans on UTF-8
-> boundaries; behaviour changes come with tests in `tests/uctan_uca.rs`; offsets are bytes in
-> Rust, characters in Python and UTF-16 units in JS. **Never put real personal data** in code,
-> tests, issues or logs. Add an entry under `Unreleased` in `CHANGELOG.md`. See also
-> [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Katkılar Türkçe yapılır. Ayrıca bkz. [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## Geliştirme ortamı
 

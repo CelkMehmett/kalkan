@@ -69,6 +69,6 @@ zincir = prompt | model | StrOutputParser()
 ```
 
 Tüm özellikler, sınırlamalar ve ölçümler için:
-[github.com/CelkMehmett/kalkan](https://github.com/CelkMehmett/kalkan/blob/main/README.tr.md).
+[github.com/CelkMehmett/kalkan](https://github.com/CelkMehmett/kalkan/blob/main/README.md).
 
 > kalkan bir yardımcı araçtır, hukuki uyum garantisi değildir. Tespit %100 değildir.

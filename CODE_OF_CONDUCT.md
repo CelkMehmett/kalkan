@@ -1,33 +1,28 @@
-# Code of Conduct / Davranış Kuralları
-
-This project adopts the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/)
-as its code of conduct.
+# Davranış Kuralları
 
 Bu proje davranış kuralları olarak [Contributor Covenant 2.1](https://www.contributor-covenant.org/tr/version/2/1/code_of_conduct/)
 metnini benimser.
 
-## Our pledge / Taahhüdümüz
+## Taahhüdümüz
 
-We pledge to make participation in this project a harassment-free experience for everyone,
-regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics,
-gender identity and expression, level of experience, education, socio-economic status,
-nationality, personal appearance, race, religion, or sexual identity and orientation.
+Yaş, beden, görünür ya da görünmez engel, etnik köken, cinsiyet özellikleri, cinsiyet kimliği
+ve ifadesi, deneyim düzeyi, eğitim, sosyoekonomik durum, uyruk, dış görünüş, ırk, din, cinsel
+kimlik ve yönelimden bağımsız olarak bu projeye katılımı herkes için tacizden arınmış bir
+deneyim kılmayı taahhüt ediyoruz.
 
-Contributions and discussions are welcome in **English or Turkish**.
-Katkı ve tartışmalar **İngilizce veya Türkçe** yapılabilir.
+Katkı ve tartışmalar Türkçe yapılır.
 
-## In short / Kısaca
+## Kısaca
 
-- Be respectful and constructive; critique code, not people.
-- No harassment, insults, sexualised language, or personal attacks.
-- **Never post real personal data** (real ID numbers, IBANs, phone numbers, names) in issues,
-  PRs or discussions. Use checksum-valid test values such as `10000000146`.
-- Kişisel veri işleyen bir projeyiz: issue ve PR'larda **gerçek kişisel veri paylaşmayın**.
+- Saygılı ve yapıcı olun; kişileri değil kodu eleştirin.
+- Taciz, hakaret, cinsel içerikli dil ve kişisel saldırı kabul edilmez.
+- Kişisel veri işleyen bir projeyiz: issue, PR ve tartışmalarda **gerçek kişisel veri
+  paylaşmayın** (gerçek kimlik numarası, IBAN, telefon, ad). Sağlaması geçerli test değerleri
+  kullanın, ör. `10000000146`.
 
-## Enforcement / Uygulama
+## Uygulama
 
-Instances of unacceptable behaviour may be reported privately to the maintainer through
-GitHub (the repository's *Security → Report a vulnerability* form also reaches the maintainer
-privately). All reports will be reviewed and handled confidentially. Maintainers follow the
-[Contributor Covenant enforcement guidelines](https://www.contributor-covenant.org/version/2/1/code_of_conduct/#enforcement-guidelines)
-(correction, warning, temporary ban, permanent ban).
+Kabul edilemez davranışlar bakımcıya GitHub üzerinden gizlice bildirilebilir (deponun
+*Security → Report a vulnerability* formu da bakımcıya gizli olarak ulaşır). Tüm bildirimler
+gizlilikle incelenir. Bakımcılar [Contributor Covenant uygulama yönergelerini](https://www.contributor-covenant.org/tr/version/2/1/code_of_conduct/#uygulama-y%C3%B6nergeleri)
+izler (düzeltme, uyarı, geçici yasak, kalıcı yasak).

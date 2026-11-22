@@ -12,6 +12,9 @@ turkce-pii-bench test bölümünde maskeleme isabeti
 
 ### Değiştirildi
 
+- Belgeler yalnızca Türkçe: `README.md` artık Türkçe belgedir (`README.tr.md` ve İngilizce
+  README kaldırıldı); crates.io ve PyPI açıklamaları, katkı rehberi ve davranış kuralları
+  Türkçe.
 - Tespit 0.3.1'e göre yaklaşık 2,2 kat yavaş (aynı makinede 5,9 → 13,0 µs/mesaj):
   büyük ad sözlükleri, ad yayılım geçişi ve yeni dedektörler. Geliştirme sırasında
   27,7 µs'e çıkan süre, çıktı değişmeden yarıya indirildi: ad kuralı listeleri tek
