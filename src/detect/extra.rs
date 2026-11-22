@@ -175,6 +175,11 @@ fn birth_label_before(text: &str, i: usize, window: usize) -> Option<&str> {
         start += 1;
     }
     let ctx = &text[start..i];
+    // Ucuz ret: tüm etiketler "do", "d.", "bi" ile başlar (büyük/küçük harf).
+    let cb = ctx.as_bytes();
+    if !cb.windows(2).any(|w| matches!((w[0] | 0x20, w[1] | 0x20), (b'd', b'o') | (b'b', b'i')) || (w[0] | 0x20 == b'd' && w[1] == b'.')) {
+        return None;
+    }
     let (p, kw) = ctx
         .char_indices()
         .filter(|&(p, _)| boundary_before(ctx, p))
@@ -358,13 +363,17 @@ pub(crate) fn scan_passport(text: &str, out: &mut Vec<Match>) {
     let b = text.as_bytes();
     let n = b.len();
     for i in 0..n.saturating_sub(7) {
-        if !b[i].is_ascii_alphabetic() || !boundary_before(text, i) {
+        if !b[i].is_ascii_alphabetic() {
             continue;
         }
         let upper = b[i].is_ascii_uppercase();
         let mut d = i + 1;
         if d < n && b[d].is_ascii_alphabetic() && b[d].is_ascii_uppercase() == upper {
             d += 1;
+        }
+        // Ucuz ret önce: harf(ler)den sonra rakam yoksa sınır denetimine gerek yok.
+        if d >= n || !b[d].is_ascii_digit() || !boundary_before(text, i) {
+            continue;
         }
         let mut j = d;
         while j < n && b[j].is_ascii_digit() {

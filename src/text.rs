@@ -62,7 +62,14 @@ pub fn tr_upper(s: &str) -> String {
 /// Böylece hem Türkçe (`IŞIK` ↔ `ışık`) hem İngilizce (`HOLDING` ↔ `holding`)
 /// büyük harfli yazımlar eşleşir.
 pub fn fold(s: &str) -> String {
-    fold_with_map(s).0
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            'I' | 'İ' | 'ı' | 'i' => out.push('i'),
+            _ => out.extend(c.to_lowercase()),
+        }
+    }
+    out
 }
 
 /// [`fold`] + katlanmış metnin her baytının kaynak metindeki bayt konumu.
@@ -156,6 +163,25 @@ pub fn context_after_has(s: &str, i: usize, window: usize, keywords: &[&str]) ->
             && keyword_initial(ctx.as_bytes(), p, c).is_some_and(|lc| {
                 keywords.iter().any(|k| k.as_bytes().first() == Some(&lc) && starts_with_tr_ci(&ctx[p..], k))
             })
+    })
+}
+
+/// `i`'deki iki baytlık Türkçe harf: (Türkçe küçük harfi, büyük harf mi).
+pub(crate) fn tr_letter(b: &[u8], i: usize) -> Option<(&'static str, bool)> {
+    Some(match (b[i], *b.get(i + 1)?) {
+        (0xC3, 0xA7) => ("ç", false),
+        (0xC3, 0x87) => ("ç", true),
+        (0xC3, 0xB6) => ("ö", false),
+        (0xC3, 0x96) => ("ö", true),
+        (0xC3, 0xBC) => ("ü", false),
+        (0xC3, 0x9C) => ("ü", true),
+        (0xC4, 0x9F) => ("ğ", false),
+        (0xC4, 0x9E) => ("ğ", true),
+        (0xC4, 0xB1) => ("ı", false),
+        (0xC4, 0xB0) => ("i", true),
+        (0xC5, 0x9F) => ("ş", false),
+        (0xC5, 0x9E) => ("ş", true),
+        _ => return None,
     })
 }
 

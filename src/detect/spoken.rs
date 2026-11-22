@@ -9,7 +9,7 @@
 
 use crate::checksum::is_valid_tckn;
 use crate::entity::{Kind, KindSet, Match};
-use crate::text::{context_has, fold};
+use crate::text::context_has;
 
 const PHONE_WORDS: &[&str] = &["tel", "cep", "gsm", "numara", "ara", "ulaş", "ulas"];
 const TCKN_WORDS: &[&str] = &["tc", "t.c", "kimlik", "tckn"];
@@ -185,20 +185,58 @@ pub(crate) fn scan(text: &str, kinds: KindSet, claimed: &[core::ops::Range<usize
         run.clear();
     };
     let mut last_end = 0;
-    let mut it = text.char_indices().peekable();
-    while let Some((s, c)) = it.next() {
-        if !c.is_alphabetic() {
+    let mut buf = String::with_capacity(16);
+    let b = text.as_bytes();
+    let n = b.len();
+    let alpha_at = |i: usize| -> Option<usize> {
+        // Harfse karakterin bayt uzunluğu.
+        let c = b[i];
+        if c < 0x80 {
+            return c.is_ascii_alphabetic().then_some(1);
+        }
+        if crate::text::tr_letter(b, i).is_some() {
+            return Some(2);
+        }
+        let ch = text[i..].chars().next()?;
+        ch.is_alphabetic().then(|| ch.len_utf8())
+    };
+    let mut i = 0;
+    while i < n {
+        if !text.is_char_boundary(i) {
+            i += 1;
             continue;
         }
-        let mut e = s + c.len_utf8();
-        while let Some(&(k, ch)) = it.peek() {
-            if !ch.is_alphabetic() {
-                break;
+        let Some(l) = alpha_at(i) else {
+            i += 1;
+            continue;
+        };
+        let s = i;
+        let mut e = i + l;
+        while e < n {
+            match alpha_at(e) {
+                Some(l) => e += l,
+                None => break,
             }
-            e = k + ch.len_utf8();
-            it.next();
         }
-        let tok = if e - s <= 8 { token(&fold(&text[s..e])) } else { None };
+        i = e;
+        // Sayı kelimeleri bu harflerle başlar (büyük/küçük; Ü/ü UTF-8'de 0xC3 ile).
+        let first_ok = matches!(b[s] | 0x20, b's' | b'b' | b'i' | b'u' | b'd' | b'a' | b'y' | b'o' | b'k' | b'e')
+            || b[s] == 0xC3
+            || b[s] == 0xC4;
+        // `fold` ile aynı dönüşüm, kelime başına bellek tahsisi olmadan.
+        let tok = if e - s <= 8 && first_ok {
+            buf.clear();
+            for ch in text[s..e].chars() {
+                match ch {
+                    'I' | 'İ' | 'ı' | 'i' => buf.push('i'),
+                    c if c.is_ascii() => buf.push(c.to_ascii_lowercase()),
+                    _ => buf.extend(ch.to_lowercase()),
+                }
+            }
+            token(&buf)
+        } else {
+            None
+        };
         // Kelimeler arasında yalnızca boşluk olmalı.
         let joined = !run.is_empty() && text[last_end..s].bytes().all(|b| b == b' ');
         if !joined || tok.is_none() {
@@ -215,6 +253,7 @@ pub(crate) fn scan(text: &str, kinds: KindSet, claimed: &[core::ops::Range<usize
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::text::fold;
 
     fn run(s: &str) -> Vec<(Kind, String)> {
         let mut v = Vec::new();

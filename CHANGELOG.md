@@ -12,8 +12,13 @@ turkce-pii-bench test bölümünde maskeleme isabeti
 
 ### Değiştirildi
 
-- Tespit 0.3.1'e göre yaklaşık 4,7 kat yavaş (aynı makinede 5,9 → 27,7 µs/mesaj):
-  büyük ad sözlükleri ve ad yayılım geçişi.
+- Tespit 0.3.1'e göre yaklaşık 2,2 kat yavaş (aynı makinede 5,9 → 13,0 µs/mesaj):
+  büyük ad sözlükleri, ad yayılım geçişi ve yeni dedektörler. Geliştirme sırasında
+  27,7 µs'e çıkan süre, çıktı değişmeden yarıya indirildi: ad kuralı listeleri tek
+  sözlük aramasına taşındı, kelime başına denetimler bir kez hesaplanıyor, sık Türkçe
+  harfler Unicode tablosuna gitmeden işleniyor, yazıyla sayı ve tarifli adres
+  taramaları kelime başına bellek ayırmıyor, pasaport ve doğum etiketi aramalarında
+  ucuz ön eleme var.
 
 ### Eklendi
 

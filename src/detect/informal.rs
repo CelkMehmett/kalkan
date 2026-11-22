@@ -39,19 +39,40 @@ struct W {
 }
 
 fn words(text: &str) -> Vec<W> {
-    let mut v = Vec::new();
-    let mut cur: Option<W> = None;
-    for (i, c) in text.char_indices() {
-        if c.is_alphanumeric() {
-            match cur.as_mut() {
-                Some(w) => w.e = i + c.len_utf8(),
-                None => cur = Some(W { s: i, e: i + c.len_utf8() }),
-            }
-        } else if let Some(w) = cur.take() {
-            v.push(w);
+    let b = text.as_bytes();
+    let n = b.len();
+    // `i`'deki karakter harf/rakamsa bayt uzunluğu (ASCII için hızlı yol).
+    let alnum = |i: usize| -> Option<usize> {
+        if b[i] < 0x80 {
+            return b[i].is_ascii_alphanumeric().then_some(1);
         }
+        if crate::text::tr_letter(b, i).is_some() {
+            return Some(2);
+        }
+        let c = text[i..].chars().next()?;
+        c.is_alphanumeric().then(|| c.len_utf8())
+    };
+    let mut v = Vec::with_capacity(n / 6);
+    let mut i = 0;
+    while i < n {
+        if !text.is_char_boundary(i) {
+            i += 1;
+            continue;
+        }
+        let Some(l) = alnum(i) else {
+            i += 1;
+            continue;
+        };
+        let s = i;
+        i += l;
+        while i < n {
+            match alnum(i) {
+                Some(l) => i += l,
+                None => break,
+            }
+        }
+        v.push(W { s, e: i });
     }
-    v.extend(cur);
     v
 }
 
@@ -59,6 +80,25 @@ fn is_spatial(w: &str) -> bool {
     ["daki", "deki", "taki", "teki"].iter().any(|k| w.ends_with(k))
         && SPATIAL_STEMS.iter().any(|s| w.starts_with(s))
         && w.chars().count() <= 16
+}
+
+/// Kelime (harf duyarsız) "daki/deki/taki/teki" ile bitiyor mu? Bellek tahsissiz ön eleme.
+fn ki_suffix(w: &str) -> bool {
+    // Son harf (katlanınca) "i" olmalı: i, I, ı (C4 B1), İ (C4 B0).
+    let b = w.as_bytes();
+    let last_i = match b {
+        [.., b'i' | b'I'] => true,
+        [.., 0xC4, 0xB0 | 0xB1] => true,
+        _ => false,
+    };
+    if !last_i {
+        return false;
+    }
+    let mut it = w.chars().rev().map(fold_char);
+    matches!(
+        (it.next(), it.next(), it.next(), it.next()),
+        (Some('i'), Some('k'), Some('a' | 'e'), Some('d' | 't'))
+    )
 }
 
 fn verb_like(w: &str) -> bool {
@@ -167,19 +207,20 @@ pub(crate) fn scan_informal(text: &str, out: &mut Vec<Match>) {
         return;
     }
     let ws = words(text);
-    let lw: Vec<String> = ws.iter().map(|w| if w.e - w.s <= 40 { fold(&text[w.s..w.e]) } else { String::new() }).collect();
+    // Küçük harfli biçim yalnızca aday kelimelerin çevresinde gerekir.
+    let lw = |k: usize| if ws[k].e - ws[k].s <= 40 { fold(&text[ws[k].s..ws[k].e]) } else { String::new() };
     let spaces = |a: usize, b: usize| {
         let g = &text[ws[a].e..ws[b].s];
         !g.is_empty() && g.len() <= 2 && g.bytes().all(|c| c == b' ')
     };
     let mut i = 0;
     while i < ws.len() {
-        if !is_spatial(&lw[i]) {
+        if !ki_suffix(&text[ws[i].s..ws[i].e]) || !is_spatial(&lw(i)) {
             i += 1;
             continue;
         }
         // Konut sözcüğü: aynı öbekte, en fazla 3 kelime sonra.
-        let Some(j) = (i + 1..ws.len().min(i + 4)).take_while(|&j| spaces(j - 1, j)).find(|&j| is_dwelling(&lw[j])) else {
+        let Some(j) = (i + 1..ws.len().min(i + 4)).take_while(|&j| spaces(j - 1, j)).find(|&j| is_dwelling(&lw(j))) else {
             i += 1;
             continue;
         };
@@ -190,8 +231,8 @@ pub(crate) fn scan_informal(text: &str, out: &mut Vec<Match>) {
         while a > 0
             && i - a < MAX_LEFT
             && spaces(a - 1, a)
-            && !LEFT_STOP.contains(&lw[a - 1].as_str())
-            && !verb_like(&lw[a - 1])
+            && !LEFT_STOP.contains(&lw(a - 1).as_str())
+            && !verb_like(&lw(a - 1))
             && !text[ws[a].s..].starts_with(char::is_uppercase)
         {
             a -= 1;

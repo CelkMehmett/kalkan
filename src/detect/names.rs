@@ -156,16 +156,30 @@ struct Word {
 }
 
 // Sözlük bayrakları: bir kelime birden çok listede olabilir.
-const F_TITLE: u16 = 1;
-const F_SUFFIX: u16 = 2;
-const F_STRONG: u16 = 4;
-const F_WEAK: u16 = 8;
-const F_STOP: u16 = 16;
-const F_FIRST: u16 = 32;
-const F_KIN: u16 = 64;
-const F_SUR: u16 = 128;
-const F_ORG: u16 = 256;
-const F_SUR2: u16 = 512;
+const F_TITLE: u32 = 1;
+const F_SUFFIX: u32 = 2;
+const F_STRONG: u32 = 4;
+const F_WEAK: u32 = 8;
+const F_STOP: u32 = 16;
+const F_FIRST: u32 = 32;
+const F_KIN: u32 = 64;
+const F_SUR: u32 = 128;
+const F_ORG: u32 = 256;
+const F_SUR2: u32 = 512;
+const F_INTRO: u32 = 1 << 10;
+const F_LBEFORE: u32 = 1 << 11;
+const F_LAFTER: u32 = 1 << 12;
+const F_LCOMMON: u32 = 1 << 13;
+const F_ANSWER: u32 = 1 << 14;
+const F_SPEAKER: u32 = 1 << 15;
+const F_QUESTION: u32 = 1 << 16;
+const F_BEHALF: u32 = 1 << 17;
+/// Küçük harfli ad adayını eleyen bayraklar: ad/soyad dışındaki eski listeler ve
+/// LOWER_COMMON / LOWER_BEFORE / LOWER_AFTER. (Çağrı dökümü ve "adına" bayrakları elemez.)
+const LOWER_REJECT: u32 =
+    F_TITLE | F_SUFFIX | F_STRONG | F_WEAK | F_STOP | F_KIN | F_ORG | F_LCOMMON | F_LBEFORE | F_LAFTER;
+/// "adına / namına": önündeki kelimeler ad ("Hilal Balta adına").
+const BEHALF: &[&str] = &["adına", "adina", "namına", "namina"];
 
 /// Kısa anahtarlar için hızlı FNV-1a (SipHash'e göre birkaç kat hızlı).
 #[derive(Default)]
@@ -185,7 +199,7 @@ impl core::hash::Hasher for Fnv {
     }
 }
 
-type Lexicon = HashMap<&'static str, u16, BuildHasherDefault<Fnv>>;
+type Lexicon = HashMap<&'static str, u32, BuildHasherDefault<Fnv>>;
 
 /// Tüm listeleri tek bir tabloda birleştirir: kelime başına tek arama.
 fn lexicon() -> &'static Lexicon {
@@ -201,6 +215,14 @@ fn lexicon() -> &'static Lexicon {
             (KIN, F_KIN),
             (ORG, F_ORG),
             (COMMON_WORD_SURNAMES, F_SUR2),
+            (INTRO, F_INTRO),
+            (LOWER_BEFORE, F_LBEFORE),
+            (LOWER_AFTER, F_LAFTER),
+            (LOWER_COMMON, F_LCOMMON),
+            (ANSWERERS, F_ANSWER),
+            (SPEAKERS, F_SPEAKER),
+            (NAME_QUESTIONS, F_QUESTION),
+            (BEHALF, F_BEHALF),
         ] {
             for &w in set {
                 *m.entry(w).or_insert(0) |= flag;
@@ -250,6 +272,13 @@ fn tokenize(text: &str, words: &mut Vec<Word>, arena: &mut String) {
                 }
                 arena.push(if c == b'I' { 'ı' } else { c.to_ascii_lowercase() as char });
                 i += 1;
+            } else if let Some((lower, upper)) = crate::text::tr_letter(b, i) {
+                // Sık Türkçe harfler: Unicode tablolarına gitmeden.
+                if i == s {
+                    cap = upper;
+                }
+                arena.push_str(lower);
+                i += 2;
             } else {
                 let ch = text[i..].chars().next().unwrap_or(' ');
                 if !ch.is_alphabetic() {
@@ -284,11 +313,11 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
     // `out` önceki dedektörlerin konuma göre sıralı olmayan eşleşmelerini de taşır;
     // "az önce bulunan ad" denetimleri yalnızca bu aşamanın eklediklerine bakmalı.
     let base = out.len();
-    let flags: Vec<u16> = words
+    let flags: Vec<u32> = words
         .iter()
         .map(|w| if w.le > w.ls { lex.get(&arena[w.ls..w.le]).copied().unwrap_or(0) } else { 0 })
         .collect();
-    let has = |k: usize, f: u16| flags[k] & f != 0;
+    let has = |k: usize, f: u32| flags[k] & f != 0;
     let gap = |a: usize, b: usize| &text[words[a].e..words[b].s];
     let space_gap = |a: usize, b: usize| {
         let g = gap(a, b);
@@ -313,13 +342,16 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
     // Önceki ayraçta noktalama var mı ("… adına. Hesap", "ekip, Annem"). `sentence_start`
     // ". " ayracını unvan ayracı ("Dr. Ahmet") saydığı için cümle başlarını kaçırabilir.
     let after_punct = |k: usize| k == 0 || gap(k - 1, k).contains(['.', '!', '?', '\n', ':', ',']);
-    let nameable = |k: usize| {
-        words[k].cap
-            && !has(k, F_STOP | F_TITLE | F_SUFFIX | F_KIN)
-            && !common(k)
-            && !label_after(k)
-            && !in_claimed(k)
-    };
+    let nameable_v: Vec<bool> = (0..n)
+        .map(|k| {
+            words[k].cap
+                && !has(k, F_STOP | F_TITLE | F_SUFFIX | F_KIN)
+                && !common(k)
+                && !label_after(k)
+                && !in_claimed(k)
+        })
+        .collect();
+    let nameable = |k: usize| nameable_v[k];
 
     // `k`'dan başlayan büyük harfli kelime zinciri: [k, son] (dahil).
     let chain = |k: usize| -> Option<(usize, usize)> {
@@ -356,18 +388,19 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
 
     // Küçük harfli bağlam kuralı için aday kelime.
     let lw = |k: usize| &arena[words[k].ls..words[k].le];
-    let lower_name = |k: usize| {
-        !words[k].cap
-            && words[k].le > words[k].ls
-            && flags[k] & !(F_FIRST | F_SUR | F_SUR2) == 0
-            && !LOWER_COMMON.contains(&lw(k))
-            && !(lw(k).chars().count() > 4 && VERB_ENDINGS.iter().any(|e| lw(k).ends_with(e)))
-            && !LOWER_BEFORE.contains(&lw(k))
-            && !LOWER_AFTER.contains(&lw(k))
-            && !common(k)
-            && !label_after(k)
-            && !in_claimed(k)
-    };
+    // Diğer listelerdeki kelimeler (LOWER_COMMON, LOWER_BEFORE/AFTER, hitap ...) bayrakla elenir.
+    let lower_v: Vec<bool> = (0..n)
+        .map(|k| {
+            !words[k].cap
+                && words[k].le > words[k].ls
+                && flags[k] & LOWER_REJECT == 0
+                && !(lw(k).chars().count() > 4 && VERB_ENDINGS.iter().any(|e| lw(k).ends_with(e)))
+                && !common(k)
+                && !label_after(k)
+                && !in_claimed(k)
+        })
+        .collect();
+    let lower_name = |k: usize| lower_v[k];
 
     // Sözlükteki adla başlayan küçük harfli zincir: "izzet yekta demiroğlu", "ben banu".
     let lower_dict_chain = |k: usize| -> Option<usize> {
@@ -404,20 +437,20 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
     // Çağrı dökümü: ad soran ifadeden sonra (aynı satırda, en çok altı kelime içinde)
     // konuşmacı etiketi ve ardından bir-üç küçük harfli kelime, sonraki etikete kadar.
     let answer_after_question = |k: usize| -> Option<usize> {
-        if k == 0 || words[k].cap || !ANSWERERS.contains(&lw(k - 1)) || !space_gap(k - 1, k) {
+        if k == 0 || words[k].cap || !has(k - 1, F_ANSWER) || !space_gap(k - 1, k) {
             return None;
         }
         let asked = (k.saturating_sub(7)..k - 1)
-            .any(|q| NAME_QUESTIONS.contains(&lw(q)) && !text[words[q].e..words[k].s].contains('\n'));
+            .any(|q| has(q, F_QUESTION) && !text[words[q].e..words[k].s].contains('\n'));
         if !asked || !lower_name(k) {
             return None;
         }
         let mut b = k;
-        while b + 1 < n && b - k < MAX_CHAIN - 1 && space_gap(b, b + 1) && lower_name(b + 1) && !SPEAKERS.contains(&lw(b + 1)) {
+        while b + 1 < n && b - k < MAX_CHAIN - 1 && space_gap(b, b + 1) && lower_name(b + 1) && !has(b + 1, F_SPEAKER) {
             b += 1;
         }
         // Yanıtın sonu: konuşmacı etiketi, noktalama ya da metin sonu.
-        let ends = b + 1 == n || !space_gap(b, b + 1) || SPEAKERS.contains(&lw(b + 1));
+        let ends = b + 1 == n || !space_gap(b, b + 1) || has(b + 1, F_SPEAKER);
         // "müşteri söylemek istemiyorum": yanıtta en az bir sözlük kelimesi olmalı.
         let dict = (k..=b).any(|j| has(j, F_FIRST | F_SUR | F_SUR2));
         (ends && dict).then_some(b)
@@ -425,7 +458,7 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
     // "Hilal Balta adına", "kaan budak adına kayıtlı": ardından "adına / namına" gelen
     // iki-üç kelime. Büyük harfte şirket unvanı zinciri zaten elenir; küçük harfte
     // en az bir kelime ad ya da soyad sözlüğünde olmalı.
-    let behalf = |k: usize| k < n && matches!(lw(k), "adına" | "adina" | "namına" | "namina");
+    let behalf = |k: usize| k < n && has(k, F_BEHALF);
     let mut k = 0;
     while k < n {
         if let Some(b) = answer_after_question(k) {
@@ -447,11 +480,11 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
                 }
             }
         } else if k + 2 < n
+            && behalf(k + 2)
             && lower_name(k)
             && lower_name(k + 1)
             && space_gap(k, k + 1)
             && space_gap(k + 1, k + 2)
-            && behalf(k + 2)
             && (has(k, F_FIRST | F_SUR) || has(k + 1, F_FIRST | F_SUR | F_SUR2))
         {
             push(out, k, k + 1, 72);
@@ -459,7 +492,7 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
             continue;
         }
         // 6) Tanıtma: "adım Evren Uslu", "Ben Berçem Akbulak", "hoş geldiniz ben banu".
-        if INTRO.contains(&lw(k)) && k + 1 < n && space_gap(k, k + 1) {
+        if has(k, F_INTRO) && k + 1 < n && space_gap(k, k + 1) {
             if words[k + 1].cap {
                 if let Some((a, b)) = chain(k + 1) {
                     if b > a || has(a, F_FIRST) || (lw(k) != "ben" && line_ends_after(a)) {
@@ -501,7 +534,7 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
         }
 
         // 5) Küçük harf: "adım mizgîn özbek", "av. aysun", "meltem tuna hanım".
-        if !words[k].cap && LOWER_BEFORE.contains(&lw(k)) && k + 1 < n && title_gap(gap(k, k + 1)) && lower_name(k + 1) {
+        if !words[k].cap && has(k, F_LBEFORE) && k + 1 < n && title_gap(gap(k, k + 1)) && lower_name(k + 1) {
             let mut b = k + 1;
             while b + 1 < n && b - k < 2 && space_gap(b, b + 1) && lower_name(b + 1) {
                 b += 1;
@@ -510,7 +543,7 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
             k = b + 1;
             continue;
         }
-        if !words[k].cap && LOWER_AFTER.contains(&lw(k)) && k > 0 && space_gap(k - 1, k) && lower_name(k - 1) {
+        if !words[k].cap && has(k, F_LAFTER) && k > 0 && space_gap(k - 1, k) && lower_name(k - 1) {
             let already = out[base..].last().is_some_and(|m| m.span.end > words[k - 1].s);
             let mut a = k - 1;
             while a > 0 && k - a < 2 && space_gap(a - 1, a) && lower_name(a - 1) {
@@ -612,9 +645,13 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
     // … teşekkürler çağatay bey", "Telli Hukuk Bürosu … Av. Tuba Telli".
     // Yalnızca güçlü bağlamla (unvan, hitap, tanıtma, form etiketi) bulunan adlar
     // yayılır; zayıf kuralların hataları çoğalmasın.
-    let found: Vec<core::ops::Range<usize>> = out[base..].iter().map(|m| m.span.clone()).collect();
     let strong: Vec<core::ops::Range<usize>> =
         out[base..].iter().filter(|m| m.confidence >= 80).map(|m| m.span.clone()).collect();
+    if strong.is_empty() {
+        drop_historical(text, &words, base, out);
+        return;
+    }
+    let found: Vec<core::ops::Range<usize>> = out[base..].iter().map(|m| m.span.clone()).collect();
     let covered = |k: usize| found.iter().any(|r| words[k].s < r.end && r.start < words[k].e);
     let mut known: Vec<&str> = (0..n)
         .filter(|&k| strong.iter().any(|r| r.start <= words[k].s && words[k].e <= r.end))
@@ -627,7 +664,7 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
         !covered(k)
             && known.binary_search(&lw(k)).is_ok()
             && !has(k, F_STOP | F_TITLE | F_SUFFIX | F_KIN | F_ORG | F_STRONG | F_WEAK)
-            && !LOWER_COMMON.contains(&lw(k))
+            && !has(k, F_LCOMMON)
             && !common(k)
             && !label_after(k)
             && !in_claimed(k)
@@ -636,7 +673,7 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
             // "Demir kapı açıktı": cümle başında kelime olan soyadı yayılmaz.
             && !(has(k, F_SUR2) && after_punct(k))
     };
-    let mut k = 0;
+    let mut k = if known.is_empty() { n } else { 0 };
     while k < n {
         if again(k) {
             let mut b = k;
@@ -659,11 +696,15 @@ fn drop_historical(text: &str, words: &[Word], base: usize, out: &mut Vec<Match>
         let span = out[i].span.clone();
         let first = words.partition_point(|w| w.e <= span.start);
         let last = words.partition_point(|w| w.s < span.end);
-        let lo = words[first.saturating_sub(2)].s;
-        let hi = words[(last + 1).min(words.len()) - 1].e;
-        let window = crate::text::tr_lower(&text[lo..hi]);
         let own = crate::text::tr_lower(&text[span]);
-        if HISTORICAL.iter().any(|h| h.contains(own.as_str()) && window.contains(h)) {
+        // Pencere yalnızca eşleşme bir tarihî adın parçasıysa hazırlanır.
+        let hit = HISTORICAL.iter().any(|h| h.contains(own.as_str())) && {
+            let lo = words[first.saturating_sub(2)].s;
+            let hi = words[(last + 1).min(words.len()) - 1].e;
+            let window = crate::text::tr_lower(&text[lo..hi]);
+            HISTORICAL.iter().any(|h| h.contains(own.as_str()) && window.contains(h))
+        };
+        if hit {
             out.remove(i);
         } else {
             i += 1;
@@ -691,7 +732,7 @@ mod tests {
     fn lists_are_lowercase_and_short() {
         for set in [
             TITLES, SUFFIXES, KIN, STRONG_LABELS, WEAK_LABELS, STOP, NOT_NAME_PREFIX, ORG, COMMON_WORD_SURNAMES,
-            NAME_QUESTIONS, SPEAKERS, ANSWERERS,
+            NAME_QUESTIONS, SPEAKERS, ANSWERERS, INTRO, LOWER_BEFORE, LOWER_AFTER, LOWER_COMMON, BEHALF,
         ] {
             for w in set {
                 assert_eq!(crate::text::tr_lower(w), *w);
