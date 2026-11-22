@@ -274,7 +274,7 @@ mesajın doğru etiketleri bilinir). Karşılaştırma: [kvkk-pii](https://pypi.
 **yalnızca regex katmanı** ile (model yok; adil kıyas için kişi adı kuralı eklendi).
 Ortam: 2 çekirdekli Intel Xeon 2.1 GHz sanal makine. kalkan v0.2'nin 12 türü açık (v0.3'te eklenen adres
 ve SGK dedektörleri tespit süresini yaklaşık %14 artırır).
-**v0.4, tespitte v0.3.1'den yaklaşık 2,2 kat yavaştır** (aynı makinede ölçüldü: 5,9 → 13,0 µs/mesaj);
+**v0.4, tespitte v0.3.1'den yaklaşık 2 kat yavaştır** (aynı makinede ölçüldü: 5,8 → 11,9 µs/mesaj);
 büyüyen ad sözlükleri ve ad yayılım geçişi, isabet karşılığında süre harcar. Aşağıdaki tablo v0.2 ile
 ölçülmüştür ve özgün sanal makinede yeniden çalıştırılmamıştır.
 
