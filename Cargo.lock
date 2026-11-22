@@ -25,11 +25,11 @@ dependencies = [
 
 [[package]]
 name = "kalkan"
-version = "0.3.1"
+version = "0.4.0"
 
 [[package]]
 name = "kalkan-py"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "kalkan",
  "pyo3",

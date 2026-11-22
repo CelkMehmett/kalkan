@@ -274,6 +274,9 @@ A 5 MB corpus of 11,617 synthetic Turkish customer-support messages (generated b
 [kvkk-pii](https://pypi.org/project/kvkk-pii/) using **only its regex layer** (no model; a
 person-name rule was added for fairness). Machine: 2-core Intel Xeon 2.1 GHz VM. The 12 kalkan
 types of v0.2 enabled (the address and SGK detectors added in v0.3 cost about 14% more detection time).
+**v0.4 is about 4.7× slower at detection than v0.3.1** (measured on the same machine: 5.9 → 27.7 µs/message);
+the larger name dictionaries and the name propagation pass cost time in exchange for recall.
+The table below was measured with v0.2 and has not been re-run on the original VM.
 
 | | kalkan | kvkk-pii (regex) |
 |---|---|---|

@@ -5,6 +5,16 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-22
+
+turkce-pii-bench test bölümünde maskeleme isabeti
+%58,1'den (0.3.1) %86,2'ye, sızan varlık oranı %14,1'e geldi (makro F1 90,7).
+
+### Değiştirildi
+
+- Tespit 0.3.1'e göre yaklaşık 4,7 kat yavaş (aynı makinede 5,9 → 27,7 µs/mesaj):
+  büyük ad sözlükleri ve ad yayılım geçişi.
+
 ### Eklendi
 
 - Ad ve soyad sözlükleri (`src/detect/veri/`): 151 elle yazılmış adın yerine
