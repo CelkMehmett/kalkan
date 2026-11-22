@@ -39,6 +39,9 @@ const WEAK_LABELS: &[&str] = &[
     "alacaklı", "alıcı", "aday", "başvuran", "borçlu", "çalışan", "danışan", "davacı", "davalı",
     "gönderen", "gönderici", "hasta", "kefil", "kiracı", "lehtar", "mağdur", "müvekkil", "müşteri",
     "personel", "refakatçi", "sahibi", "sanık", "sigortalı", "sürücü", "tanık", "veli", "öğrenci",
+    // Meslekler (iki noktasız 2+ kelime): "şoförümüz Alev Novak", "Emlakçı Kader Irmak".
+    "doktoru", "doktorumuz", "eksper", "eksperi", "emlakçı", "emlakçımız", "kurye", "kuryemiz",
+    "kuryeniz", "öğretmeni", "öğretmenimiz", "şoför", "şoförü", "şoförümüz", "şoförünüz",
 ];
 /// Ad zincirine girmemesi gereken büyük harfli kelimeler.
 const STOP: &[&str] = &[
@@ -179,6 +182,14 @@ const F_BEHALF: u32 = 1 << 17;
 /// LOWER_COMMON / LOWER_BEFORE / LOWER_AFTER. (Çağrı dökümü ve "adına" bayrakları elemez.)
 const LOWER_REJECT: u32 =
     F_TITLE | F_SUFFIX | F_STRONG | F_WEAK | F_STOP | F_KIN | F_ORG | F_LCOMMON | F_LBEFORE | F_LAFTER;
+/// Selamlama: ardından gelen hitap ad ("Merhaba Sevtap,").
+const GREETINGS: &[&str] = &["günaydın", "merhaba", "merhabalar", "selam", "selamlar"];
+/// Selamlamadan sonra gelse de ad olmayan hitaplar.
+const GREET_NOT: &[&str] = &[
+    "arkadaşlar", "beyler", "dostlar", "ekip", "ekibi", "efendim", "hanımlar", "herkes", "herkese",
+    "hocam", "millet", "komşular", "tekrar", "yine",
+];
+const F_GREET: u32 = 1 << 18;
 /// "adına / namına": önündeki kelimeler ad ("Hilal Balta adına").
 const BEHALF: &[&str] = &["adına", "adina", "namına", "namina"];
 
@@ -224,6 +235,7 @@ fn lexicon() -> &'static Lexicon {
             (SPEAKERS, F_SPEAKER),
             (NAME_QUESTIONS, F_QUESTION),
             (BEHALF, F_BEHALF),
+            (GREETINGS, F_GREET),
         ] {
             for &w in set {
                 *m.entry(w).or_insert(0) |= flag;
@@ -510,6 +522,18 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
                 }
             }
         }
+        // 6b) Selamlama hitabı: "Merhaba Sevtap,", "Selam Ayşe Kaya!" — ardından virgül,
+        // ünlem ya da satır sonu gelmeli ("Merhaba Kargo şirketi" değil).
+        if has(k, F_GREET) && k + 1 < n && space_gap(k, k + 1) && words[k + 1].cap && !GREET_NOT.contains(&lw(k + 1)) {
+            if let Some((a, b)) = chain(k + 1) {
+                let rest = text[words[b].e..].trim_start_matches(' ');
+                if rest.is_empty() || rest.starts_with([',', '!', '\n']) {
+                    push(out, a, b, 75);
+                    k = b + 1;
+                    continue;
+                }
+            }
+        }
         // 7) İmza: kapanış ifadesinden sonra gelen ad.
         if words[k].cap && after_closing(k) {
             if let Some((a, b)) = chain(k) {
@@ -734,6 +758,7 @@ mod tests {
         for set in [
             TITLES, SUFFIXES, KIN, STRONG_LABELS, WEAK_LABELS, STOP, NOT_NAME_PREFIX, ORG, COMMON_WORD_SURNAMES,
             NAME_QUESTIONS, SPEAKERS, ANSWERERS, INTRO, LOWER_BEFORE, LOWER_AFTER, LOWER_COMMON, BEHALF,
+            GREETINGS, GREET_NOT,
         ] {
             for w in set {
                 assert_eq!(crate::text::tr_lower(w), *w);
@@ -815,6 +840,16 @@ mod tests {
         assert!(names("Fatih Sultan Mehmet Köprüsü trafiği yüzünden geciktim.").is_empty());
         assert_eq!(names("Etkinlik bitince Mimar Sinan'ın eserleri sergisi var."), Vec::<&str>::new());
         assert!(names("Sayın Meslektaşım, Sayın Savcılığa, Degerli Hocam,").is_empty());
+    }
+
+    #[test]
+    fn greeting_and_occupation() {
+        assert_eq!(names("Merhaba Sevtap,\nGeçen ayki yemek"), ["Sevtap"]);
+        assert_eq!(names("Selam Ayşe Kaya!"), ["Ayşe Kaya"]);
+        assert!(names("Merhaba Arkadaşlar, toplantı saat 3'te").is_empty());
+        assert!(names("Merhaba Kargo şirketiniz paketi getirmedi").is_empty());
+        assert_eq!(names("şoförümüz Alev Novak sizi arayacak"), ["Alev Novak"]);
+        assert!(names("kuryeniz Kadıköy'e gitti").is_empty());
     }
 
     #[test]

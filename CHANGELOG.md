@@ -46,6 +46,9 @@ turkce-pii-bench test bölümünde maskeleme isabeti
   ad kabul edilir ("aydınlık sok. no:163/9").
 - Zayıf ad etiketlerine rol kelimeleri eklendi: aday, başvuran, borçlu, alacaklı,
   kefil, lehtar, mağdur, sanık, tanık, çalışan, refakatçi ("Aday: Sergei Uzunoglu").
+- Selamlama hitabı ("Merhaba Sevtap,", "Selam Ayşe Kaya!"; ardından virgül, ünlem ya
+  da satır sonu) ve meslek kelimelerinden sonra 2+ kelimelik ad ("şoförümüz Alev Novak",
+  "Emlakçı Kader Irmak").
 - Ad ve soyad sözlükleri (`src/detect/veri/`): 151 elle yazılmış adın yerine
   1.699 ad ve 3.558 soyadı. Kaynak Wikidata (CC0): Türk vatandaşı kişilerin
   verilen ad (P735) ve soyadı (P734) değerleri, en az iki kişide geçenler.
