@@ -9,7 +9,7 @@ keywords = ["kvkk", "pii", "llm", "turkish", "anonymization"]
 categories = ["text-processing", "security", "command-line-utilities", "wasm"]
 readme = "README.md"
 repository = "https://github.com/CelkMehmett/kalkan"
-homepage = "https://github.com/CelkMehmett/kalkan"
+homepage = "https://celkmehmett.github.io/kalkan/"
 documentation = "https://docs.rs/kalkan"
 exclude = [".github/", "bench/", "wasm/", "target/", "corpus*", "*.jsonl"]
 

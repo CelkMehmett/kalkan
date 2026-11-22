@@ -86,12 +86,7 @@ fn is_spatial(w: &str) -> bool {
 fn ki_suffix(w: &str) -> bool {
     // Son harf (katlanınca) "i" olmalı: i, I, ı (C4 B1), İ (C4 B0).
     let b = w.as_bytes();
-    let last_i = match b {
-        [.., b'i' | b'I'] => true,
-        [.., 0xC4, 0xB0 | 0xB1] => true,
-        _ => false,
-    };
-    if !last_i {
+    if !matches!(b, [.., b'i' | b'I'] | [.., 0xC4, 0xB0 | 0xB1]) {
         return false;
     }
     let mut it = w.chars().rev().map(fold_char);

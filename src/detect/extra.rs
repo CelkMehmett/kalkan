@@ -187,7 +187,7 @@ fn birth_label_before(text: &str, i: usize, window: usize) -> Option<&str> {
         .char_indices()
         .filter(|&(p, _)| boundary_before(ctx, p))
         .filter_map(|(p, _)| BIRTH_WORDS.iter().find(|k| starts_with_tr_ci(&ctx[p..], k)).map(|k| (p, *k)))
-        .last()?;
+        .next_back()?;
     // "tahmini / beklenen doğum tarihi" bir doğumun tarihidir, kişinin doğum tarihi değil.
     let prev_word = ctx[..p].trim_end().rsplit(|c: char| !c.is_alphabetic()).next().unwrap_or("");
     if ["tahmini", "beklenen"].iter().any(|k| eq_tr_ci(prev_word, k)) {
