@@ -61,6 +61,9 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
   metindeki diğer geçişleri ("Av. Tuba Telli" → "Telli Hukuk Bürosu").
   `Belediyesi`, `Cumhuriyeti`, `Derneği`, `Üniversitesi` gibi kurum kelimeleri
   zinciri kişi adı olmaktan çıkarır.
+- Çağrı dökümlerinde ad soran ifadeden ("adınız soyadınız", "adınızı
+  alabilir miyim") sonra müşterinin verdiği yanıt ad sayılır; yanıtta en az
+  bir sözlük kelimesi gerekir.
 
 ### Düzeltildi
 
@@ -77,6 +80,9 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
 - Metnin ilerisinde başka bir eşleşme (telefon, IBAN) varsa küçük harfli ad
   ("barış fidan isimli") atlanıyordu.
 - "444 1234" gibi çağrı merkezi numaraları SGK sicil no sayılmıyor.
+- "Sayın Meslektaşım", "Sayın Savcılığa", "Sayın Tedarikçimiz", "Degerli Hocam"
+  artık ad sanılmıyor. "… Köprüsü", "… Lisesi", "… Camii" gibi yapı adları ve
+  "Fatih Sultan Mehmet", "Mimar Sinan" gibi tarihî kişiler de kişi adı sayılmıyor.
 
 ## [0.3.1] - 2026-11-18
 

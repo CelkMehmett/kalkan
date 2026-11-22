@@ -47,23 +47,38 @@ const STOP: &[&str] = &[
     "sokak", "sorumlusu", "sözleşmesi", "tc", "tckn", "tel", "telefon", "temsilcisi", "vekili", "vkn",
     "yetkilisi", "şubesi",
 ];
-/// Şirket unvanı ve kurum kelimeleri: ad zinciri bunlardan birini içerir ya da hemen ardından
+/// Şirket unvanı, kurum ve yapı kelimeleri ("… Köprüsü", "… Lisesi"): ad zinciri bunlardan birini içerir ya da hemen ardından
 /// bunlardan biri gelirse zincir kişi adı sayılmaz ("Çiğdem Mobilya", "Yılmaz İnşaat A.Ş.").
 const ORG: &[&str] = &[
     "a", "ajans", "ajansi", "ajansı", "aracilik", "aracılık", "avm", "bakanligi", "bakanlığı",
     "bankasi", "bankası", "baskanligi", "başkanlığı", "belediye", "belediyesi", "bilisim",
-    "bilişim", "cumhuriyeti", "danismanlik", "danışmanlık", "dernegi", "derneği", "ecza",
-    "eczanesi", "elektrik", "elektronik", "emlak", "enerji", "federasyonu", "gayrimenkul", "gida",
-    "giyim", "grup", "gıda", "hastanesi", "hizmetleri", "holding", "hukuk", "ihracat", "insaat",
-    "inşaat", "ithalat", "kafe", "kaymakamlığı", "kimya", "kirtasiye", "kooperatifi", "kozmetik",
-    "kuafor", "kuaför", "kurumu", "kırtasiye", "lojistik", "ltd", "makina", "makine", "market",
-    "matbaa", "medikal", "mimarlik", "mimarlık", "mobilya", "muhendislik", "mühendislik",
-    "nakliyat", "nakliye", "odası", "optik", "otomotiv", "partisi", "pazarlama", "petrol",
-    "restoran", "san", "sanayi", "sigorta", "sirketi", "sti", "teknoloji", "teknolojileri",
-    "tekstil", "tic", "ticaret", "turizm", "universitesi", "vakfi", "vakfı", "valiligi", "valiliği",
+    "bilişim", "bulvari", "bulvarı", "camii", "cumhuriyeti", "danismanlik", "danışmanlık",
+    "dernegi", "derneği", "ecza", "eczanesi", "elektrik", "elektronik", "emlak", "enerji",
+    "federasyonu", "gayrimenkul", "gida", "giyim", "grup", "gıda", "hastanesi", "havalimani",
+    "havalimanı", "hizmetleri", "holding", "hukuk", "ihracat", "insaat", "inşaat", "ithalat",
+    "kafe", "kaymakamlığı", "kimya", "kirtasiye", "kooperatifi", "koprusu", "kozmetik", "kuafor",
+    "kuaför", "kurumu", "köprüsü", "külliyesi", "kırtasiye", "lisesi", "lojistik", "ltd", "makina",
+    "makine", "market", "matbaa", "medikal", "meydani", "meydanı", "mimarlik", "mimarlık",
+    "mobilya", "muhendislik", "mühendislik", "nakliyat", "nakliye", "odası", "okulu", "optik",
+    "otomotiv", "parki", "parkı", "partisi", "pazarlama", "petrol", "restoran", "san", "sanayi",
+    "sigorta", "sirketi", "stadyumu", "sti", "teknoloji", "teknolojileri", "tekstil", "tic",
+    "ticaret", "turizm", "türbesi", "universitesi", "vakfi", "vakfı", "valiligi", "valiliği",
     "yapi", "yapı", "yatirim", "yatırım", "yayincilik", "yayinlari", "yayıncılık", "yayınları",
     "yazilim", "yazılım", "üniversitesi", "şirket", "şirketi", "şti",
 ];
+/// Yer ve yapı adlarında, metinlerde sık geçen tarihî kişiler. Yaygın kişi adı da olan
+/// birleşimler ("Yunus Emre") bilerek yok.
+const HISTORICAL: &[&str] = &[
+    "barbaros hayreddin", "fatih sultan mehmet", "ismet inönü", "kanuni sultan süleyman",
+    "mehmet akif ersoy", "mimar sinan", "mustafa kemal atatürk", "nasreddin hoca", "piri reis",
+    "yavuz sultan selim",
+];
+/// Çağrı dökümünde ad soran ifadeler ve konuşmacı etiketleri: "temsilci adınız
+/// soyadınız müşteri necdet telli temsilci …".
+const NAME_QUESTIONS: &[&str] = &["adınız", "adınızı", "adiniz", "adinizi", "isminiz", "isminizi", "soyadınız", "soyadiniz"];
+const SPEAKERS: &[&str] = &["arayan", "müşteri", "musteri", "temsilci"];
+/// Yanıtı veren taraf (temsilci soruyu sorar, yanıt vermez).
+const ANSWERERS: &[&str] = &["arayan", "müşteri", "musteri"];
 /// Kendini tanıtma: ardından gelen büyük harfli zincir ad ("adım Evren Uslu").
 const INTRO: &[&str] = &["adim", "adım", "ben", "ismim"];
 /// İmzadan önce gelen kapanış ifadeleri (iki kelimelikler boşlukla).
@@ -98,11 +113,11 @@ const LOWER_COMMON: &[&str] = &[
 /// Küçük harfli adaylarda çekimli fiil sonları ("değişmiş", "yazıyor", "gelecek").
 const VERB_ENDINGS: &[&str] = &["mış", "miş", "muş", "müş", "yor", "acak", "ecek"];
 /// Hitap sonrası büyük harfle yazılsa da ad olmayan kelimelerin başları:
-/// "Sayın İlgili", "Sayın Müşterimiz", "Sayın Hâkimliğe", "Değerli Hocam".
+/// "Sayın İlgili", "Sayın Müşterimiz", "Sayın Hâkimliğe", "Değerli Hocam", "Sayın Meslektaşım".
 const NOT_NAME_PREFIX: &[&str] = &[
-    "abone", "bakanlı", "başkan", "değerli", "hakim", "heyet", "hâkim", "ilgili", "katılımcı",
-    "kaymakam", "komisyon", "kullanıcı", "kurul", "kıymetli", "mahkeme", "müdür", "müşteri",
-    "sevgili", "valili", "yetkili", "üye",
+    "abone", "bakanlı", "bayi", "başkan", "degerli", "değerli", "hakim", "heyet", "hâkim", "ilgili",
+    "katılımcı", "kaymakam", "komisyon", "kullanıcı", "kurul", "kıymetli", "mahkeme", "meslektaş",
+    "müdür", "müşteri", "paydaş", "savcılı", "sevgili", "tedarikçi", "valili", "yetkili", "üye",
 ];
 
 /// Ad ve soyad sözlükleri (`veri/`): satır başına bir kelime, `#` ile başlayan satırlar
@@ -386,12 +401,38 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
         rest.is_empty() || rest.starts_with(['\n', '\r'])
     };
 
+    // Çağrı dökümü: ad soran ifadeden sonra (aynı satırda, en çok altı kelime içinde)
+    // konuşmacı etiketi ve ardından bir-üç küçük harfli kelime, sonraki etikete kadar.
+    let answer_after_question = |k: usize| -> Option<usize> {
+        if k == 0 || words[k].cap || !ANSWERERS.contains(&lw(k - 1)) || !space_gap(k - 1, k) {
+            return None;
+        }
+        let asked = (k.saturating_sub(7)..k - 1)
+            .any(|q| NAME_QUESTIONS.contains(&lw(q)) && !text[words[q].e..words[k].s].contains('\n'));
+        if !asked || !lower_name(k) {
+            return None;
+        }
+        let mut b = k;
+        while b + 1 < n && b - k < MAX_CHAIN - 1 && space_gap(b, b + 1) && lower_name(b + 1) && !SPEAKERS.contains(&lw(b + 1)) {
+            b += 1;
+        }
+        // Yanıtın sonu: konuşmacı etiketi, noktalama ya da metin sonu.
+        let ends = b + 1 == n || !space_gap(b, b + 1) || SPEAKERS.contains(&lw(b + 1));
+        // "müşteri söylemek istemiyorum": yanıtta en az bir sözlük kelimesi olmalı.
+        let dict = (k..=b).any(|j| has(j, F_FIRST | F_SUR | F_SUR2));
+        (ends && dict).then_some(b)
+    };
     // "Hilal Balta adına", "kaan budak adına kayıtlı": ardından "adına / namına" gelen
     // iki-üç kelime. Büyük harfte şirket unvanı zinciri zaten elenir; küçük harfte
     // en az bir kelime ad ya da soyad sözlüğünde olmalı.
     let behalf = |k: usize| k < n && matches!(lw(k), "adına" | "adina" | "namına" | "namina");
     let mut k = 0;
     while k < n {
+        if let Some(b) = answer_after_question(k) {
+            push(out, k, b, 80);
+            k = b + 1;
+            continue;
+        }
         if words[k].cap {
             if let Some((mut a, b)) = chain(k) {
                 if b > a && b + 1 < n && space_gap(b, b + 1) && behalf(b + 1) {
@@ -574,9 +615,6 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
     let found: Vec<core::ops::Range<usize>> = out[base..].iter().map(|m| m.span.clone()).collect();
     let strong: Vec<core::ops::Range<usize>> =
         out[base..].iter().filter(|m| m.confidence >= 80).map(|m| m.span.clone()).collect();
-    if strong.is_empty() {
-        return;
-    }
     let covered = |k: usize| found.iter().any(|r| words[k].s < r.end && r.start < words[k].e);
     let mut known: Vec<&str> = (0..n)
         .filter(|&k| strong.iter().any(|r| r.start <= words[k].s && words[k].e <= r.end))
@@ -610,6 +648,27 @@ pub(crate) fn scan(text: &str, claimed: &[core::ops::Range<usize>], out: &mut Ve
         }
         k += 1;
     }
+    drop_historical(text, &words, base, out);
+}
+
+/// "Fatih Sultan Mehmet Köprüsü", "Mimar Sinan'ın eserleri": eşleşme, çevresiyle birlikte
+/// bilinen bir tarihî kişi adının parçasıysa kişisel veri değildir.
+fn drop_historical(text: &str, words: &[Word], base: usize, out: &mut Vec<Match>) {
+    let mut i = base;
+    while i < out.len() {
+        let span = out[i].span.clone();
+        let first = words.partition_point(|w| w.e <= span.start);
+        let last = words.partition_point(|w| w.s < span.end);
+        let lo = words[first.saturating_sub(2)].s;
+        let hi = words[(last + 1).min(words.len()) - 1].e;
+        let window = crate::text::tr_lower(&text[lo..hi]);
+        let own = crate::text::tr_lower(&text[span]);
+        if HISTORICAL.iter().any(|h| h.contains(own.as_str()) && window.contains(h)) {
+            out.remove(i);
+        } else {
+            i += 1;
+        }
+    }
 }
 
 /// Unvandan sonra izin verilen ayraç: " ", ". ", "." (ör. "Dr.Ahmet").
@@ -630,11 +689,17 @@ mod tests {
 
     #[test]
     fn lists_are_lowercase_and_short() {
-        for set in [TITLES, SUFFIXES, KIN, STRONG_LABELS, WEAK_LABELS, STOP, NOT_NAME_PREFIX, ORG, COMMON_WORD_SURNAMES] {
+        for set in [
+            TITLES, SUFFIXES, KIN, STRONG_LABELS, WEAK_LABELS, STOP, NOT_NAME_PREFIX, ORG, COMMON_WORD_SURNAMES,
+            NAME_QUESTIONS, SPEAKERS, ANSWERERS,
+        ] {
             for w in set {
                 assert_eq!(crate::text::tr_lower(w), *w);
                 assert!(w.len() <= MAX_LOWER, "{w}");
             }
+        }
+        for h in HISTORICAL {
+            assert_eq!(crate::text::tr_lower(h), *h);
         }
         for set in [FIRST_NAMES, SURNAMES] {
             for w in lines(set) {
@@ -691,6 +756,23 @@ mod tests {
         assert!(names("kendi şirketim adına başvurdum, annem adına da.").is_empty());
         assert!(names("ali kara bir kedi gördü").is_empty());
         assert_eq!(names("Sayın Ayşe Demir, gelemedi. Demir kapı açıktı."), ["Ayşe Demir"]);
+    }
+
+    #[test]
+    fn transcript_answer_and_landmarks() {
+        assert_eq!(
+            names("temsilci adınız soyadınız müşteri oğuzhan kovalenko temsilci teşekkürler oğuzhan bey"),
+            ["oğuzhan kovalenko", "oğuzhan"]
+        );
+        assert_eq!(names("temsilci adınızı tam olarak alabilir miyim müşteri su tuna temsilci"), ["su tuna"]);
+        // Soru yoksa ya da yanıt cümle gibi uzarsa ad sayılmaz.
+        assert!(names("temsilci nasıl yardımcı olabilirim müşteri kartım kayboldu temsilci").is_empty());
+        assert!(names("temsilci adınız soyadınız müşteri bir saniye bakıyorum hemen söylüyorum").is_empty());
+        assert!(names("temsilci adınızı alayım müşteri söylemek istemiyorum temsilci").is_empty());
+        assert!(names("temsilci adınızı alayım müşteri temsilci soyadınızın yazılışı müşteri").is_empty());
+        assert!(names("Fatih Sultan Mehmet Köprüsü trafiği yüzünden geciktim.").is_empty());
+        assert_eq!(names("Etkinlik bitince Mimar Sinan'ın eserleri sergisi var."), Vec::<&str>::new());
+        assert!(names("Sayın Meslektaşım, Sayın Savcılığa, Degerli Hocam,").is_empty());
     }
 
     #[test]
