@@ -423,6 +423,16 @@ fn stream_restorer_is_independent_of_session() {
     assert_eq!(h.join().unwrap(), "Kayıt 10000000146 tamam");
 }
 
+#[test]
+fn lowercase_name_survives_later_number() {
+    // Metnin ilerisindeki telefon, küçük harfli adın "zaten bulundu" sanılmasına yol açmamalı.
+    let t = "şikayet\nbarış fidan isimli biri kapora aldı, numarası 05321234567.";
+    assert_eq!(
+        found(t),
+        vec![(Kind::Name, "barış fidan".into()), (Kind::Phone, "05321234567".into())]
+    );
+}
+
 // ---------------------------------------------------------------- adres ve SGK
 
 #[test]

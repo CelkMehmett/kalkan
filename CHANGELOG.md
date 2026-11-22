@@ -49,6 +49,18 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
   gruplamalarda ("doksan beş yüz yetmiş") tüm okumalar denenir; TCKN sağlaması
   tutan okuma seçilir. En az 10 hane gerekir, sıradan metindeki sayılar
   eşleşmez.
+- SGK sicil no için yeni bağlam ifadeleri: "sosyal güvenlik", "sigortalı
+  sicil/no", "sigortalılık", "emekli sandığı", "tahsis no", "işyeri sicil".
+  Hemen solunda SGK etiketi olan bitişik numara telefon ya da kart yerine SGK
+  sayılır ("SGK sicil no: 5371451377").
+- Tek başına doğum yılı ("1959 doğumlu", "doğum yılım 1998") ve yılsız doğum
+  günü ("doğum günüm 7 Nisan"), yalnızca etikete bitişikse.
+- Ad tespiti: ardından `adına` gelen iki-üç kelimelik ad ("faturalar Hilal
+  Balta adına", "kaan budak adına"); sözlükteki addan sonra kelime olan yaygın
+  soyadları ("nazım yıldız", "bircan kaya"); güçlü bağlamla bulunan bir adın
+  metindeki diğer geçişleri ("Av. Tuba Telli" → "Telli Hukuk Bürosu").
+  `Belediyesi`, `Cumhuriyeti`, `Derneği`, `Üniversitesi` gibi kurum kelimeleri
+  zinciri kişi adı olmaktan çıkarır.
 
 ### Düzeltildi
 
@@ -56,6 +68,15 @@ Bu dosya [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) biçimini ve
   "Müşteri Hizmetleri" gibi hitap ve kurum kelimeleri artık ad sanılmıyor.
 - Gelecekteki tarihler doğum tarihi olarak işaretlenmiyor ("teslimat
   19.03.2027"). wasm hedefinde saat olmadığı için bu denetim yapılmaz.
+- Doğum etiketi yalnızca kendi tarihini kapsıyor: "doğum tarihim 19.02.1983,
+  sipariş tarihim 02.11.2025" ya da "… 07.07.2020 tarihinde işe başladım"
+  cümlelerindeki ikinci tarih ve "tahmini doğum tarihi" artık doğum tarihi
+  sayılmıyor.
+- Büyük "İ" ile başlayan bağlam kelimeleri ("İkamet adresi", "İşyeri sicil")
+  hiç eşleşmiyordu.
+- Metnin ilerisinde başka bir eşleşme (telefon, IBAN) varsa küçük harfli ad
+  ("barış fidan isimli") atlanıyordu.
+- "444 1234" gibi çağrı merkezi numaraları SGK sicil no sayılmıyor.
 
 ## [0.3.1] - 2026-11-18
 
