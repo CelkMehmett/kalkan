@@ -6,7 +6,14 @@ use crate::text::{boundary_after, boundary_before, context_after_has, context_ha
 const VERSION_WORDS: &[&str] = &["sürüm", "versiyon", "version", "ver.", "build", "release", "v."];
 const BIRTH_WORDS: &[&str] = &["doğum", "dogum", "d.tarihi", "d. tarihi", "d.t.", "doğ.", "birth", "dob"];
 const PASSPORT_WORDS: &[&str] = &["pasaport", "passport"];
-const SGK_WORDS: &[&str] = &["sgk", "ssk", "bağ-kur", "bağkur", "bag-kur", "bagkur", "emekli sicil", "sigorta sicil"];
+const SGK_WORDS: &[&str] = &[
+    "sgk", "ssk", "bağ-kur", "bağkur", "bag-kur", "bagkur", "emekli sicil", "sigorta sicil",
+    "sosyal güvenlik", "sosyal guvenlik", "sigortalı sicil", "sigortali sicil", "sigortalı no",
+    "sigortali no", "sigortalı numara", "sigortali numara", "sigortalılık", "sigortalilik",
+    "emekli sandığı", "emekli sandigi", "tahsis no", "tahsis numara", "işyeri sicil", "isyeri sicil",
+];
+/// SGK etiketiyle numara arasında bunlardan biri varsa numara SGK'nın değildir.
+const SGK_PHONE_WORDS: &[&str] = &["tel", "cep", "gsm", "whatsapp", "faks", "fax"];
 /// Numaradan sonra gelen SGK bağlamı: "84883037 numaralı SGK sicil", "85387200 sicil numaralı".
 const SGK_AFTER_WORDS: &[&str] = &["sgk", "ssk", "bağ-kur", "bagkur", "bağkur", "sicil"];
 /// Tarihten sonra gelen doğum bağlamı: "12.03.1990 doğumlu".
@@ -293,6 +300,7 @@ pub(crate) fn scan_social_security(text: &str, out: &mut Vec<Match>) {
     let b = text.as_bytes();
     let n = b.len();
     let taken = out.len();
+    let mut displaced = Vec::new();
     let mut i = 0;
     while i < n {
         let Some(off) = b[i..].iter().position(u8::is_ascii_digit) else { break };
@@ -302,16 +310,49 @@ pub(crate) fn scan_social_security(text: &str, out: &mut Vec<Match>) {
             j += 1;
         }
         // Ucuz kontroller önce; bağlam araması yalnızca aday sayılar için.
-        if (6..=13).contains(&(j - i))
-            && boundary_before(text, i)
-            && boundary_after(text, j)
-            && !out[..taken].iter().any(|m| m.span.start < j && i < m.span.end)
-            && (context_has(text, i, 32, SGK_WORDS) || context_after_has(text, j, 24, SGK_AFTER_WORDS))
-        {
-            out.push(Match::new(Kind::SocialSecurity, i..j, 85));
+        // 444'lü yedi haneli numaralar çağrı merkezidir ("SGK hattı 4441234").
+        let call_center = j - i == 7 && b[i..].starts_with(b"444");
+        if (6..=13).contains(&(j - i)) && !call_center && boundary_before(text, i) && boundary_after(text, j) {
+            let clash = out[..taken].iter().position(|m| m.span.start < j && i < m.span.end);
+            match clash {
+                None if context_has(text, i, 40, SGK_WORDS) || context_after_has(text, j, 24, SGK_AFTER_WORDS) => {
+                    out.push(Match::new(Kind::SocialSecurity, i..j, 85));
+                }
+                // Bitişik yazılmış numara telefon ya da kart sanıldıysa ama hemen
+                // solunda SGK etiketi varsa ("SGK sicil no: 5371451377") SGK kazanır.
+                // Geçerli TCKN olduğu gibi kalır.
+                Some(k)
+                    if matches!(out[k].kind, Kind::Phone | Kind::Card)
+                        && out[k].span == (i..j)
+                        && sgk_label_right_before(text, i) =>
+                {
+                    displaced.push(k);
+                    out.push(Match::new(Kind::SocialSecurity, i..j, 85));
+                }
+                _ => {}
+            }
         }
         i = j;
     }
+    displaced.sort_unstable();
+    for k in displaced.into_iter().rev() {
+        out.remove(k);
+    }
+}
+
+/// Numaranın hemen solunda (aynı satırda, arada başka rakam ya da telefon
+/// sözcüğü olmadan) SGK etiketi var mı?
+fn sgk_label_right_before(text: &str, i: usize) -> bool {
+    let b = text.as_bytes();
+    let mut start = i;
+    while start > 0 && i - start < 40 && !b[start - 1].is_ascii_digit() && b[start - 1] != b'\n' {
+        start -= 1;
+    }
+    while !text.is_char_boundary(start) {
+        start += 1;
+    }
+    let seg = &text[start..i];
+    context_has(seg, seg.len(), seg.len(), SGK_WORDS) && !context_has(seg, seg.len(), seg.len(), SGK_PHONE_WORDS)
 }
 
 #[cfg(test)]
@@ -368,5 +409,10 @@ mod tests {
         assert_eq!(run(scan_social_security, "gelir belgemi ve 84883037 numaralı SGK sicil dökümü"), ["84883037"]);
         assert_eq!(run(scan_social_security, "kayıtlı 85387200 sicil numaralı sigortalı"), ["85387200"]);
         assert!(run(scan_social_security, "Sipariş 3401234567 kargoya verildi").is_empty());
+        assert_eq!(run(scan_social_security, "Sosyal Güvenlik Kurumu sicil numaram 34012345"), ["34012345"]);
+        assert_eq!(run(scan_social_security, "emekli sandığı tahsis no 1234567"), ["1234567"]);
+        assert!(run(scan_social_security, "sigorta poliçe no 3401234567").is_empty());
+        assert_eq!(run(scan_social_security, "İşyeri sicil numaramız 3412345"), ["3412345"]);
+        assert!(run(scan_social_security, "Sosyal güvenlik hattı 4441234").is_empty());
     }
 }

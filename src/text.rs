@@ -108,6 +108,19 @@ pub fn eq_tr_ci(a: &str, b: &str) -> bool {
     b.chars().all(|k| ia.next().is_some_and(|c| tr_lower_char(c) == k)) && ia.next().is_none()
 }
 
+/// `p` konumundaki harfin anahtar kelime karşılaştırmasındaki küçük ASCII karşılığı.
+/// "İ" (C4 B0) iki baytlıktır ama küçüğü ASCII "i"dir ("İkamet", "İşyeri").
+#[inline]
+fn keyword_initial(b: &[u8], p: usize, c: u8) -> Option<u8> {
+    if c.is_ascii_alphabetic() {
+        Some(c.to_ascii_lowercase())
+    } else if c == 0xC4 && b.get(p + 1) == Some(&0xB0) {
+        Some(b'i')
+    } else {
+        None
+    }
+}
+
 /// `i` konumundan geriye `window` baytlık bölgede verilen (küçük harfli) anahtar
 /// kelimelerden biri geçiyor mu? Türkçe büyük/küçük harf duyarsız, tahsissiz.
 pub fn context_has(s: &str, i: usize, window: usize, keywords: &[&str]) -> bool {
@@ -120,9 +133,9 @@ pub fn context_has(s: &str, i: usize, window: usize, keywords: &[&str]) -> bool 
     // Tüm anahtar kelimeler ASCII harfle başlar: önce baytla ilk harfi eşle,
     // yalnızca tutarsa (Unicode'a duyarlı) tam karşılaştırma yap.
     ctx.bytes().enumerate().any(|(p, c)| {
-        let lc = c.to_ascii_lowercase();
-        c.is_ascii_alphabetic()
-            && keywords.iter().any(|k| k.as_bytes().first() == Some(&lc) && starts_with_tr_ci(&ctx[p..], k))
+        keyword_initial(ctx.as_bytes(), p, c).is_some_and(|lc| {
+            keywords.iter().any(|k| k.as_bytes().first() == Some(&lc) && starts_with_tr_ci(&ctx[p..], k))
+        })
     })
 }
 
@@ -139,16 +152,22 @@ pub fn context_after_has(s: &str, i: usize, window: usize, keywords: &[&str]) ->
     let cut = ctx.bytes().position(|c| matches!(c, b',' | b';' | b':' | b'\n' | b'.')).unwrap_or(ctx.len());
     let ctx = &ctx[..cut];
     ctx.bytes().enumerate().any(|(p, c)| {
-        let lc = c.to_ascii_lowercase();
-        c.is_ascii_alphabetic()
-            && (p == 0 || !ctx.as_bytes()[p - 1].is_ascii_alphabetic())
-            && keywords.iter().any(|k| k.as_bytes().first() == Some(&lc) && starts_with_tr_ci(&ctx[p..], k))
+        (p == 0 || !ctx.as_bytes()[p - 1].is_ascii_alphabetic())
+            && keyword_initial(ctx.as_bytes(), p, c).is_some_and(|lc| {
+                keywords.iter().any(|k| k.as_bytes().first() == Some(&lc) && starts_with_tr_ci(&ctx[p..], k))
+            })
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn context_dotted_capital_i() {
+        assert!(context_has("İkamet adresi: ", 15, 15, &["ikamet"]));
+        assert!(context_after_has(" İşyeri sicil", 0, 20, &["işyeri"]));
+    }
 
     #[test]
     fn turkish_case() {

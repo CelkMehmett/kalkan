@@ -426,6 +426,18 @@ fn stream_restorer_is_independent_of_session() {
 // ---------------------------------------------------------------- adres ve SGK
 
 #[test]
+fn social_security_beats_phone_only_with_label() {
+    // 5 ile başlayan 10 haneli sicil no telefon gibi görünür; etiket SGK'yı seçer.
+    assert_eq!(found("SGK sicil no: 5371451377"), vec![(Kind::SocialSecurity, "5371451377".into())]);
+    // Arada telefon sözcüğü ya da başka bir numara varsa telefon kalır.
+    assert_eq!(found("SGK'dan aradılar, cep 5371451377"), vec![(Kind::Phone, "5371451377".into())]);
+    assert_eq!(
+        found("SGK sicil no 34012345, numaram 5371451377"),
+        vec![(Kind::SocialSecurity, "34012345".into()), (Kind::Phone, "5371451377".into())]
+    );
+}
+
+#[test]
 fn address_and_social_security() {
     let t = "Teslimat adresi: Caferağa Mah. Moda Cad. No:12/3 Kadıköy/İstanbul. \
              SGK sicil no: 3401234567, SGK no: 10000000146. Bağdat Caddesi'nde trafik var.";
