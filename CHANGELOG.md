@@ -39,6 +39,11 @@ turkce-pii-bench test bölümünde maskeleme isabeti
   `min_confidence(60)` ile istenirse maskelenir.
 - Sağında "sürüm/versiyon/version" geçen noktalı dörtlü ("3.6.0.84 sürümünden") IP
   değil sürüm numarası sayılır (güven 50), solundaki gibi.
+- Adres sınırları: posta kodundan sonra "Keşan/Edirne" bütün alınır; sola genişleme
+  "Adres", "teslimat" gibi etiketlerde ve cümle başındaki ilk kelimede durur ("Araç
+  Portakal Cd." → "Portakal Cd."); kişi adlı sokaklarda unvan kısaltması adın
+  parçasıdır ("Dr. Yağmur Kaya Cd."); ardından numara gelen küçük harfli tek kelimelik
+  ad kabul edilir ("aydınlık sok. no:163/9").
 - Ad ve soyad sözlükleri (`src/detect/veri/`): 151 elle yazılmış adın yerine
   1.699 ad ve 3.558 soyadı. Kaynak Wikidata (CC0): Türk vatandaşı kişilerin
   verilen ad (P735) ve soyadı (P734) değerleri, en az iki kişide geçenler.

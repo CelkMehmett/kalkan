@@ -112,6 +112,29 @@ fn name_part(text: &str, w: Word) -> bool {
     (w.cap && !is_in(&text[w.start..w.end], NUMBER_LABELS)) || (w.digit && w.end - w.start <= 5)
 }
 
+/// Sokak adındaki unvan kısaltmaları (ardından ". " gelir).
+const TITLE_ABBR: &[&str] = &["alb", "av", "doç", "dr", "gen", "op", "org", "prof", "yzb"];
+
+/// Sola genişlemede ad parçası sayılmayan kelimeler.
+const LEFT_STOP: &[&str] = &["adres", "adresi", "adresim", "adresimiz", "adresine", "ikamet", "teslimat"];
+
+/// `i` cümle/satır başında mı (önünde yalnızca boşluk, ". ", ": ", "\n" ...)?
+fn sentence_start(text: &str, i: usize) -> bool {
+    let before = text[..i].trim_end_matches(' ');
+    before.is_empty() || before.ends_with(['.', '!', '?', '\n', ':'])
+}
+
+/// `k`'deki çapanın önünde küçük harfli bir kelime ve çapadan sonra numara etiketi + sayı var mı?
+fn lower_named_with_number(text: &str, w: &[Word], k: usize, pos: usize) -> bool {
+    let p = w[k - 1];
+    let lower = !p.cap && !p.digit && text[p.start..p.end].chars().all(char::is_alphabetic);
+    let label = w.get(k + 1).is_some_and(|n| {
+        pos <= n.start && soft_gap(&text[pos..n.start]) && is_in(&text[n.start..n.end], NUMBER_LABELS)
+    });
+    let num = w.get(k + 2).is_some_and(|d| d.digit);
+    lower && &text[p.end..w[k].start] == " " && label && num && !is_in(&text[p.start..p.end], LEFT_STOP)
+}
+
 /// Aynı satır ve cümlede, adresin hemen önünde "adres/teslimat" gibi bir kelime var mı?
 fn label_before(text: &str, start: usize) -> bool {
     let mut from = start.saturating_sub(40);
@@ -155,10 +178,25 @@ pub(crate) fn scan_address(text: &str, out: &mut Vec<Match>) {
             let p = w[left - 1];
             let gap = &text[p.end..w[left].start];
             let dotted_num = gap == ". " && p.digit; // "1453. Sokak"
-            if !(gap == " " || dotted_num) || !name_part(text, p) {
+            // Kişi adlı sokak: "Dr. Sadık Ahmet Cd.", "Av. Âdem Yavuz Sk."
+            let dotted_title = gap == ". " && is_in(&text[p.start..p.end], TITLE_ABBR);
+            if !(gap == " " || dotted_num || dotted_title) || !name_part(text, p) || is_in(&text[p.start..p.end], LEFT_STOP) {
                 break;
             }
             left -= 1;
+        }
+        // Cümle başındaki büyük harf ad olduğunu göstermez ("Araç Portakal Cd.",
+        // "Tebligatın Kemalpaşa Mahallesi"): ad en az iki kelimeyse ilki bırakılır.
+        if k - left >= 2
+            && !w[left].digit
+            && !is_in(&text[w[left].start..w[left].end], TITLE_ABBR)
+            && sentence_start(text, w[left].start)
+        {
+            left += 1;
+        }
+        // Küçük harfli tek kelimelik ad, ardından numara geliyorsa: "aydınlık sok. no:163/9".
+        if left == k && k > 0 && lower_named_with_number(text, &w, k, pos) {
+            left = k - 1;
         }
         if left == k {
             k += 1;
@@ -211,6 +249,11 @@ pub(crate) fn scan_address(text: &str, out: &mut Vec<Match>) {
                     if next < w.len() && w[next].cap && &text[pos..w[next].start] == " " {
                         pos = w[next].end;
                         next += 1;
+                        // "34710 Kadıköy/İstanbul"
+                        if next < w.len() && w[next].cap && text[pos..w[next].start].trim() == "/" {
+                            pos = w[next].end;
+                            next += 1;
+                        }
                     }
                     continue;
                 }
@@ -251,7 +294,8 @@ pub(crate) fn scan_address(text: &str, out: &mut Vec<Match>) {
                 && !is_in(&text[w[m].start..w[m].end], BUILDING)
             {
                 let gap = w.get(m + 1).map_or("", |nx| &text[w[m].end..nx.start]);
-                if !(gap == " " || (w[m].digit && gap == ". ")) {
+                let title = gap == ". " && is_in(&text[w[m].start..w[m].end], TITLE_ABBR);
+                if !(gap == " " || (w[m].digit && gap == ". ") || title) {
                     break;
                 }
                 m += 1;
@@ -293,6 +337,21 @@ mod tests {
         let mut v = Vec::new();
         scan_address(s, &mut v);
         v.iter().filter(|m| m.confidence >= 70).map(|m| m.text(s)).collect()
+    }
+
+    #[test]
+    fn boundaries() {
+        // Posta kodu + ilçe/il
+        assert_eq!(run("Gökdere Mah., Bereket Sk. No:12 D:9, 22960 Keşan/Edirne."), ["Gökdere Mah., Bereket Sk. No:12 D:9, 22960 Keşan/Edirne"]);
+        // Cümle başındaki ve etiket kelimesi sola alınmaz.
+        assert_eq!(run("Araç Portakal Cd. No: 26 Kat:2 D:22 adresindeki otoparkta."), ["Portakal Cd. No: 26 Kat:2 D:22"]);
+        assert_eq!(run("Adres Cevizli Mahallesi Serçe Cad. No:12 Kars"), ["Cevizli Mahallesi Serçe Cad. No:12 Kars"]);
+        // Kişi adlı sokak unvanıyla birlikte.
+        assert_eq!(run("Adres: Yeşilyurt Mah., Dr. Yağmur Kaya Cd. No:17 Artuklu/Mardin"), ["Yeşilyurt Mah., Dr. Yağmur Kaya Cd. No:17 Artuklu/Mardin"]);
+        // Küçük harfli tek kelime + numara.
+        assert_eq!(run("adres aydınlık sok. no:163/9 zil bozuk"), ["aydınlık sok. no:163/9"]);
+        // Cümle başındaki tek kelimelik ad korunur.
+        assert_eq!(run("Moda Cad. No:5 Kadıköy/İstanbul"), ["Moda Cad. No:5 Kadıköy/İstanbul"]);
     }
 
     #[test]
