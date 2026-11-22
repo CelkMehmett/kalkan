@@ -36,8 +36,9 @@ const STRONG_LABELS: &[&str] = &[
 /// Zayıf etiketler (en az 2 büyük harfli kelime ister).
 /// İki noktasız da çalışırlar ("Hesap sahibi Tülay Ünal"), o zaman en az 2 kelime ister.
 const WEAK_LABELS: &[&str] = &[
-    "alıcı", "danışan", "davacı", "davalı", "gönderen", "gönderici", "hasta", "kiracı", "müvekkil",
-    "müşteri", "personel", "sahibi", "sigortalı", "sürücü", "veli", "öğrenci",
+    "alacaklı", "alıcı", "aday", "başvuran", "borçlu", "çalışan", "danışan", "davacı", "davalı",
+    "gönderen", "gönderici", "hasta", "kefil", "kiracı", "lehtar", "mağdur", "müvekkil", "müşteri",
+    "personel", "refakatçi", "sahibi", "sanık", "sigortalı", "sürücü", "tanık", "veli", "öğrenci",
 ];
 /// Ad zincirine girmemesi gereken büyük harfli kelimeler.
 const STOP: &[&str] = &[

@@ -44,6 +44,8 @@ turkce-pii-bench test bölümünde maskeleme isabeti
   Portakal Cd." → "Portakal Cd."); kişi adlı sokaklarda unvan kısaltması adın
   parçasıdır ("Dr. Yağmur Kaya Cd."); ardından numara gelen küçük harfli tek kelimelik
   ad kabul edilir ("aydınlık sok. no:163/9").
+- Zayıf ad etiketlerine rol kelimeleri eklendi: aday, başvuran, borçlu, alacaklı,
+  kefil, lehtar, mağdur, sanık, tanık, çalışan, refakatçi ("Aday: Sergei Uzunoglu").
 - Ad ve soyad sözlükleri (`src/detect/veri/`): 151 elle yazılmış adın yerine
   1.699 ad ve 3.558 soyadı. Kaynak Wikidata (CC0): Türk vatandaşı kişilerin
   verilen ad (P735) ve soyadı (P734) değerleri, en az iki kişide geçenler.
