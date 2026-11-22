@@ -1,7 +1,7 @@
 //! IP adresi, doğum tarihi, pasaport ve SGK sicil no dedektörleri.
 
 use crate::entity::{Kind, Match};
-use crate::text::{boundary_after, boundary_before, context_after_has, context_has, eq_tr_ci};
+use crate::text::{boundary_after, boundary_before, context_after_has, context_has, eq_tr_ci, starts_with_tr_ci};
 
 const VERSION_WORDS: &[&str] = &["sürüm", "versiyon", "version", "ver.", "build", "release", "v."];
 const BIRTH_WORDS: &[&str] = &["doğum", "dogum", "d.tarihi", "d. tarihi", "d.t.", "doğ.", "birth", "dob"];
@@ -145,17 +145,102 @@ pub(crate) fn scan_birth_date(text: &str, out: &mut Vec<Match>) {
             continue;
         }
         if let Some(end) = numeric_date(b, i).or_else(|| textual_date(text, i)) {
-            let ctx = context_has(text, i, 60, BIRTH_WORDS) || context_after_has(text, end, 16, BIRTH_AFTER_WORDS);
+            // Soldaki etiket bu tarihe ait olmalı ("doğum tarihim 19.02.1983, sipariş
+            // tarihim 02.11.2026" ikinci tarihi kapsamaz) ve tarih başka bir olayın
+            // tarihi olmamalı ("07.07.2026 tarihinde işe başladım").
+            let left = birth_label_before(text, i, 60).is_some() && !followed_by_tarih(text, end);
+            let ctx = left || context_after_has(text, end, 16, BIRTH_AFTER_WORDS);
             if boundary_after(text, end) && ctx && !in_future(b, i, end) {
                 out.push(Match::new(Kind::BirthDate, i..end, 90));
                 i = end;
                 continue;
             }
+        } else if let Some(end) = birth_year(text, i).or_else(|| birth_day_month(text, i)) {
+            out.push(Match::new(Kind::BirthDate, i..end, 85));
+            i = end;
+            continue;
         }
         while i < n && b[i].is_ascii_digit() {
             i += 1;
         }
     }
+}
+
+/// Tarihin solundaki son doğum etiketi bu tarihe mi ait? Aitse etiket öbeğinden
+/// ("doğum", "doğum tarihim", "doğum yılınız") sonra tarihe kadar kalan metni döndürür.
+/// Arada başka bir tarih etiketi varsa ("…, sipariş tarihim") etiket bu tarihin değildir.
+fn birth_label_before(text: &str, i: usize, window: usize) -> Option<&str> {
+    let mut start = i.saturating_sub(window);
+    while !text.is_char_boundary(start) {
+        start += 1;
+    }
+    let ctx = &text[start..i];
+    let (p, kw) = ctx
+        .char_indices()
+        .filter(|&(p, _)| boundary_before(ctx, p))
+        .filter_map(|(p, _)| BIRTH_WORDS.iter().find(|k| starts_with_tr_ci(&ctx[p..], k)).map(|k| (p, *k)))
+        .last()?;
+    // "tahmini / beklenen doğum tarihi" bir doğumun tarihidir, kişinin doğum tarihi değil.
+    let prev_word = ctx[..p].trim_end().rsplit(|c: char| !c.is_alphabetic()).next().unwrap_or("");
+    if ["tahmini", "beklenen"].iter().any(|k| eq_tr_ci(prev_word, k)) {
+        return None;
+    }
+    // Etiket sözcüğünün geri kalanını ("doğum|lu", "doğum|unuz") atla.
+    let mut q = p + ctx[p..].chars().take(kw.chars().count()).map(char::len_utf8).sum::<usize>();
+    q += word_len(&ctx[q..]);
+    // "doğum tarihi / günü / yılı" öbeğini tek etiket say.
+    let after_ws = q + (ctx[q..].len() - ctx[q..].trim_start().len());
+    let next = &ctx[after_ws..];
+    if ["tarih", "gün", "gun", "yıl", "yil"].iter().any(|k| starts_with_tr_ci(next, k)) {
+        q = after_ws + word_len(next);
+    }
+    let rest = &ctx[q..];
+    let other_date_label = rest
+        .char_indices()
+        .any(|(r, _)| boundary_before(rest, r) && starts_with_tr_ci(&rest[r..], "tarih"));
+    (!other_date_label).then_some(rest)
+}
+
+/// Baştaki harf dizisinin bayt uzunluğu.
+fn word_len(s: &str) -> usize {
+    s.char_indices().find(|(_, c)| !c.is_alphabetic()).map_or(s.len(), |(k, _)| k)
+}
+
+/// Etiket ile değer arasında yalnızca boşluk ve ":" / "(" var mı ("doğum yılım: 1998")?
+fn label_adjacent(rest: &str) -> bool {
+    rest.chars().all(|c| c.is_whitespace() || matches!(c, ':' | '(' | '-'))
+}
+
+/// Tarihten hemen sonra "tarihinde / tarihli" geliyor mu?
+fn followed_by_tarih(text: &str, end: usize) -> bool {
+    starts_with_tr_ci(text[end..].trim_start(), "tarih")
+}
+
+/// Tek başına doğum yılı: "1959 doğumlu", "doğum yılım 1998".
+fn birth_year(text: &str, i: usize) -> Option<usize> {
+    let b = text.as_bytes();
+    let (y, end) = read_num(b, i, 4, 4)?;
+    if !(1900..=current_year().unwrap_or(2030)).contains(&y) || !boundary_after(text, end) {
+        return None;
+    }
+    let after = text[end..].trim_start();
+    let dogumlu = ["doğumlu", "dogumlu"].iter().any(|k| starts_with_tr_ci(after, k));
+    let labelled = birth_label_before(text, i, 32).is_some_and(label_adjacent);
+    (dogumlu || labelled).then_some(end)
+}
+
+/// Yılsız doğum günü, yalnızca etiketin hemen ardından: "doğum günüm 7 Nisan".
+fn birth_day_month(text: &str, i: usize) -> Option<usize> {
+    let b = text.as_bytes();
+    let (d, j) = read_num(b, i, 1, 2)?;
+    if b.get(j) != Some(&b' ') {
+        return None;
+    }
+    let we = j + 1 + word_len(&text[j + 1..]);
+    let month = MONTHS.iter().position(|&m| eq_tr_ci(&text[j + 1..we], m))? as u32 + 1;
+    // Yılı izleyen biçimler textual_date'e kalır; 2000 artık yıl olduğu için 29 Şubat geçer.
+    let label = birth_label_before(text, i, 40).is_some_and(label_adjacent);
+    (valid_dmy(d, month, 2000) && label).then_some(we)
 }
 
 /// Doğum tarihi gelecekte olamaz: "teslimat 19.03.2027" gibi tarihleri eler.
@@ -391,6 +476,16 @@ mod tests {
         assert_eq!(run(scan_birth_date, "doğum: 29.02.2000"), ["29.02.2000"]);
         assert_eq!(run(scan_birth_date, "Hasta 12.03.1990 doğumlu"), ["12.03.1990"]);
         assert!(run(scan_birth_date, "Doğum iznim 1 Mayıs 2999 tarihinde bitiyor").is_empty());
+        // Etiket yalnızca kendi tarihini kapsar.
+        assert_eq!(run(scan_birth_date, "Doğum tarihim 19.02.1983, sipariş tarihim 02.11.2025."), ["19.02.1983"]);
+        assert_eq!(run(scan_birth_date, "1959 doğumluyum, 07.07.2020 tarihinde işe başladım"), ["1959"]);
+        assert_eq!(run(scan_birth_date, "Eşimin doğum tarihi 11.05.1994, oğlumun 26.01.2014."), ["11.05.1994", "26.01.2014"]);
+        // Tek başına yıl ve yılsız gün-ay yalnızca etikete bitişikse.
+        assert_eq!(run(scan_birth_date, "doğum yılım 1998, hasta (1977 doğumlu)"), ["1998", "1977"]);
+        assert_eq!(run(scan_birth_date, "Doğum günüm 7 Nisan. Doğum tarihiniz: 29 Şubat"), ["7 Nisan", "29 Şubat"]);
+        assert!(run(scan_birth_date, "doğum yılınızı teyit edelim, sipariş 1954 adet").is_empty());
+        assert!(run(scan_birth_date, "Doğum günü kampanyası 2024 yılında 7 Nisan'a kadar").is_empty());
+        assert!(run(scan_birth_date, "Bebeğin tahmini doğum tarihi 20 Kasım, beklenen doğum 03.12.2025").is_empty());
     }
 
     #[test]
